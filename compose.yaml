@@ -1,0 +1,10 @@
+services:
+  nbp_test_posgres:
+    image: postgres
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: passowrod123
+      POSTGRES_USER: testadmin
+    ports:
+      - 5432:5432
