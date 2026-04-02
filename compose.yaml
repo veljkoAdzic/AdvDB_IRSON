@@ -1,3 +1,4 @@
+# Temporary db for testing
 services:
   nbp_test_posgres:
     image: postgres

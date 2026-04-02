@@ -17,16 +17,16 @@ $$ LANGUAGE sql IMMUTABLE;
 --------------------------------------------------------------------------------------------------------------------------------------------
 CREATE TABLE SPORT (
   id             SERIAL NOT NULL,
-  name           varchar(255) NOT NULL,
+  name           varchar(30) NOT NULL,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE SPORT_CATEGORY (
     id            SERIAL NOT NULL,
-    name          varchar(255) NOT NULL,
+    name          varchar(60) NOT NULL,
     sport_id      int4 NOT NULL,
     gender        char(1) NOT NULL,
-    specification varchar(255),
+    specification varchar(100),
     PRIMARY KEY (id),
     CONSTRAINT GENDER_CHECK CHECK (gender IN ('M', 'F')),
     CONSTRAINT sport_fk FOREIGN KEY (sport_id) REFERENCES SPORT (id)
@@ -35,29 +35,29 @@ CREATE TABLE SPORT_CATEGORY (
 -- Veljko
 CREATE TABLE COUNTRY (
   id          SERIAL NOT NULL,
-  name        varchar(255) NOT NULL,
+  name        varchar(50) NOT NULL,
   abreviation varchar(5) NOT NULL,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE SPONSOR (
   id   SERIAL NOT NULL,
-  name varchar(255) NOT NULL,
+  name varchar(30) NOT NULL,
   PRIMARY KEY (id)
 );
 
 -- Veljko
 CREATE TABLE COMPETITION_TYPE (
     id         SERIAL NOT NULL,
-    type_label varchar(255) NOT NULL,
+    type_label varchar(70) NOT NULL,
     PRIMARY KEY (id)
 );
 
 -- Antonio
 CREATE TABLE PERSON (
     ssn           char(13) NOT NULL, -- smenet varchar -> char - Veljko
-    first_name    varchar(255) NOT NULL,
-    last_name     varchar(255) NOT NULL,
+    first_name    varchar(30) NOT NULL,
+    last_name     varchar(30) NOT NULL,
     date_of_birth date NOT NULL,
     gender        char(1) NOT NULL,
     country_id    int4 NOT NULL, -- dodadeno - Aleksandar
@@ -72,7 +72,7 @@ CREATE TABLE PERSON (
 CREATE TABLE FEDERATION (
     id       SERIAL NOT NULL,
     sport_id int4 NOT NULL,
-    name     varchar(255) NOT NULL,
+    name     varchar(50) NOT NULL,
     PRIMARY KEY (id),
 
     CONSTRAINT unique_federation_name UNIQUE (name), -- dodaden konstraint - Antonio
@@ -101,9 +101,9 @@ CREATE TABLE NATIONAL_FEDERATION ( -- Smeneto ime - Antonio
 CREATE TABLE LOCATION (
     id         SERIAL NOT NULL,
     country_id int4 NOT NULL,
-    name       varchar(255) NOT NULL,
+    name       varchar(50) NOT NULL,
     capacity   int4 NOT NULL,
-    address    varchar(255) NOT NULL,
+    address    varchar(100) NOT NULL,
     PRIMARY KEY (id),
 
     CONSTRAINT check_capacity CHECK(capacity>0), -- DODADEN CONSTRAINT
@@ -114,7 +114,7 @@ CREATE TABLE LOCATION (
 -- Antonio
 CREATE TABLE REGION (
     id              SERIAL NOT NULL,
-    name            varchar(255) NOT NULL, -- DODADENO LAB
+    name            varchar(70) NOT NULL, -- DODADENO LAB
     part_of_country bool NOT NULL,
     PRIMARY KEY (id)
 );
@@ -133,7 +133,7 @@ CREATE TABLE COUNTRY_REGION ( -- Smeneno ime - Veljko+Antonio
 CREATE TABLE NATIONAL_LEAGUE (
     id             SERIAL NOT NULL,
     federation_id  int4 NOT NULL,
-    name           varchar(255) NOT NULL,
+    name           varchar(50) NOT NULL,
     date_started   date NOT NULL,
     date_dispanded date,
     region_id      int4,
@@ -147,7 +147,7 @@ CREATE TABLE NATIONAL_LEAGUE (
 CREATE TABLE SPORT_CLUB (
     id                         SERIAL       NOT NULL,
     federation_id              int4         NOT NULL,
-    name                       varchar(255) NOT NULL,
+    name                       varchar(40) NOT NULL,
     is_national_representation bool         NOT NULL,
     country_id                 int4         NOT NULL, -- dodadeno - Aleksandar
     PRIMARY KEY (id),
@@ -183,7 +183,7 @@ CREATE TABLE SPORT_TEAM (
     id        SERIAL NOT NULL,
     club_id   int4 NOT NULL,
     season_id int4 NOT NULL,
-    name      varchar(255) NOT NULL,
+    name      varchar(40) NOT NULL,
     capacity  int4 NOT NULL,
     standing  int4,
     PRIMARY KEY (id),
@@ -271,7 +271,7 @@ CREATE TABLE COMPETITION (
     type                    int4         NOT NULL,
     organizer_federation_id int4         NOT NULL,
     season_id               int4,
-    name                    varchar(255) NOT NULL,
+    name                    varchar(40)  NOT NULL,
     start_date              date         NOT NULL,
     end_date                date,
     PRIMARY KEY (id),
