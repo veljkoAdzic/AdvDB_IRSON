@@ -1,3 +1,0 @@
-# Save only .vpp from diagram/
-diagram/
-!./*.vpp
