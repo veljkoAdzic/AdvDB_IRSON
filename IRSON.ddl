@@ -262,8 +262,8 @@ CREATE TABLE DUEL (
 
 CREATE TABLE SCORE (
     id          SERIAL NOT NULL,
-    player_ssn  char(13) NOT NULL,
     duel_id     int4 NOT NULL,
+    player_ssn  char(13) NOT NULL,
     time_score  time NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT player_ssn FOREIGN KEY (player_ssn) REFERENCES SPORTSPERSON (ssn) ON DELETE RESTRICT ON UPDATE CASCADE,
