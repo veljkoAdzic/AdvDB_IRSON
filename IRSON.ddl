@@ -129,10 +129,11 @@ CREATE TABLE NATIONAL_LEAGUE (
 CREATE TABLE SPORT_CLUB (
     id                         SERIAL       NOT NULL,
     federation_id              int4         NOT NULL,
-    name                       varchar(40) NOT NULL,
+    name                       varchar(40)  NOT NULL,
     is_national_representation bool         NOT NULL,
     country_id                 int4         NOT NULL,
     PRIMARY KEY (id),
+    UNIQUE(name, country_id),
     FOREIGN KEY (country_id) REFERENCES COUNTRY (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT nat_fed_fk FOREIGN KEY (federation_id) REFERENCES NATIONAL_FEDERATION (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
@@ -564,3 +565,4 @@ CREATE TRIGGER trg_limit_referee_daily_duels
 BEFORE INSERT OR UPDATE ON REFEREEING_DUEL
 FOR EACH ROW
 EXECUTE FUNCTION check_referee_availability();
+
