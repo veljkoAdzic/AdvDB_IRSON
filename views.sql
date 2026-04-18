@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION season_team_standings(
     p_season_id INT,
-    p_start_date DATE,
-    p_end_date DATE
+    p_start_date DATE DEFAULT NULL,
+    p_end_date DATE DEFAULT NULL
 )
 RETURNS TABLE (
     team_id INT,
@@ -40,8 +40,8 @@ WITH duel_results AS (
        AND c.season_id = p_season_id
     JOIN SPORT_CATEGORY spca
         ON spca.id = d.sport_category_id
-    WHERE d.start_time::date >= p_start_date
-      AND d.start_time::date <= p_end_date
+    WHERE (p_start_date IS NULL OR d.start_time::date >= p_start_date)
+      AND (p_end_date IS NULL OR d.start_time::date <= p_end_date)
 )
 SELECT
     t.id AS team_id,
@@ -53,10 +53,8 @@ SELECT
             WHEN (t.id = dr.home_team_id AND dr.home_team_goals > dr.away_team_goals)
               OR (t.id = dr.away_team_id AND dr.away_team_goals > dr.home_team_goals)
                 THEN dr.points_per_win
-
             WHEN dr.home_team_goals = dr.away_team_goals
                 THEN dr.points_per_draw
-
             ELSE dr.points_per_losing
         END
     ) AS total_points
@@ -69,9 +67,9 @@ $$ LANGUAGE sql;
 
 CREATE OR REPLACE FUNCTION get_duels(
     p_state TEXT,
-    p_sport_category_id INT,
-    p_competition_id INT,
-    p_limit INT DEFAULT 100,
+    p_sport_category_id INT DEFAULT NULL,
+    p_competition_id INT DEFAULT NULL,
+    p_limit INT DEFAULT 10,
     p_offset INT DEFAULT 0
 )
 RETURNS TABLE (
@@ -88,22 +86,22 @@ SELECT
     ht.name,
     at.name,
     l.name
-FROM duel d
-JOIN sport_team ht ON ht.id = d.home_team_id
-JOIN sport_team at ON at.id = d.away_team_id
-JOIN location l ON l.id = d.location_id
-JOIN competition c ON d.competition_id = c.id
-JOIN sport_category sc ON d.sport_category_id = sc.id
+FROM DUEL d
+JOIN SPORT_TEAM ht ON ht.id = d.home_team_id
+JOIN SPORT_TEAM at ON at.id = d.away_team_id
+JOIN LOCATION l ON l.id = d.location_id
+LEFT JOIN COMPETITION c ON d.competition_id = c.id
+JOIN SPORT_CATEGORY sc ON d.sport_category_id = sc.id
 WHERE
-    d.sport_category_id = p_sport_category_id
-    AND d.competition_id = p_competition_id
+    (p_sport_category_id IS NULL OR d.sport_category_id = p_sport_category_id)
+    AND (p_competition_id IS NULL OR d.competition_id = p_competition_id)
     AND (
         (p_state = 'future' AND d.start_time > NOW())
         OR
         (p_state = 'past' AND d.start_time < NOW())
         OR
-        (p_state = 'current' AND 
-            NOW() BETWEEN d.start_time 
+        (p_state = 'current' AND
+            NOW() BETWEEN d.start_time
             AND d.start_time + sc.duration_minutes * INTERVAL '1 minute'
         )
     )
@@ -122,34 +120,24 @@ RETURNS TABLE (
 ) AS
 $$
 WITH monthly_income AS (
-    SELECT
-        sport_team_id,
-        SUM(amount) AS total_income
+    SELECT COALESCE(SUM(amount), 0) AS total_income
     FROM SPONSORSHIP
     WHERE sport_team_id = p_team_id
       AND start_date <= NOW()::date
       AND (end_date IS NULL OR end_date > NOW()::date + INTERVAL '30 days')
-    GROUP BY sport_team_id
 ),
 monthly_spending AS (
-    SELECT
-        sc.id AS club_id,
-        SUM(spso.payout) AS total_spending
+    SELECT COALESCE(SUM(spso.payout), 0) AS total_spending
     FROM SPORTSPERSON_CONTRACT spso
-    JOIN SPORT_CLUB sc
-        ON sc.id = spso.club_id
-    JOIN SPORT_TEAM st
-        ON st.club_id = sc.id
+    JOIN SPORT_CLUB sc ON sc.id = spso.club_id
+    JOIN SPORT_TEAM st ON st.club_id = sc.id
     WHERE st.id = p_team_id
       AND spso.start_date <= NOW()::date
       AND (spso.end_date IS NULL OR spso.end_date > NOW()::date + INTERVAL '30 days')
-    GROUP BY sc.id
 )
 SELECT
-    COALESCE(mi.total_income, 0) AS income,
-    COALESCE(ms.total_spending, 0) AS spending,
-    COALESCE(mi.total_income, 0) - COALESCE(ms.total_spending, 0) AS profit
-FROM monthly_income mi
-FULL JOIN monthly_spending ms
-    ON true;
+    mi.total_income AS income,
+    ms.total_spending AS spending,
+    mi.total_income - ms.total_spending AS profit
+FROM monthly_income mi, monthly_spending ms;
 $$ LANGUAGE sql;
