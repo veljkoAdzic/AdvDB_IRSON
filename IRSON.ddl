@@ -4,7 +4,7 @@ LANGUAGE sql
 AS $$
     SELECT end_date IS NULL OR start_date < end_date;
 $$;
-
+-- test
 CREATE TABLE SPORT (
   id             SERIAL NOT NULL,
   name           varchar(30) NOT NULL,
@@ -195,13 +195,16 @@ CREATE TABLE COACHING_TEAM (
     CONSTRAINT coach_fk FOREIGN KEY (coach_ssn) REFERENCES COACH (ssn) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE DONATION (
+CREATE TABLE SPONSORSHIP (
+    id            SERIAL NOT NULL,
     sport_team_id int4 NOT NULL,
     sponsor_id    int4 NOT NULL,
-    donation_date date NOT NULL,
+    start_date	  date NOT NULL,
+    end_date	  date,
     amount        int4 NOT NULL,
-    PRIMARY KEY (sport_team_id, sponsor_id, donation_date),
+    PRIMARY KEY (id),
     CONSTRAINT amount_c CHECK ( amount > 0 ),
+    CONSTRAINT sponsorship_date_check CHECK (valid_date_range(start_date, end_date)),
     CONSTRAINT team_fk FOREIGN KEY (sport_team_id) REFERENCES SPORT_TEAM (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT sponsor_fk FOREIGN KEY (sponsor_id) REFERENCES SPONSOR (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
