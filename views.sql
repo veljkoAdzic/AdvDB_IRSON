@@ -114,6 +114,8 @@ $$ LANGUAGE sql;
 
 CREATE OR REPLACE FUNCTION monthly_profit_for_team(p_team_id INT)
 RETURNS TABLE (
+    id INT,
+    name TEXT,
     income NUMERIC,
     spending NUMERIC,
     profit NUMERIC
@@ -136,8 +138,11 @@ monthly_spending AS (
       AND (spso.end_date IS NULL OR spso.end_date > NOW()::date + INTERVAL '30 days')
 )
 SELECT
+    st.id,
+    st.name,
     mi.total_income AS income,
     ms.total_spending AS spending,
     mi.total_income - ms.total_spending AS profit
-FROM monthly_income mi, monthly_spending ms;
+FROM monthly_income mi, monthly_spending ms
+JOIN SPORT_TEAM st ON st.id = p_team_id;
 $$ LANGUAGE sql;
