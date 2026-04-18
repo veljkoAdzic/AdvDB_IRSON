@@ -4,7 +4,7 @@ LANGUAGE sql
 AS $$
     SELECT end_date IS NULL OR start_date < end_date;
 $$;
-
+-- test
 CREATE TABLE SPORT (
   id             SERIAL NOT NULL,
   name           varchar(30) NOT NULL,
