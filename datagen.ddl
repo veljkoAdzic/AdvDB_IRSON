@@ -677,7 +677,7 @@ VALUES
   ('Melanesia', FALSE), ('Caucasus', FALSE), ('Central_america', FALSE),
   ('Iberia', FALSE), ('Nile_valley', FALSE),
   ('Cascadia', TRUE), ('Great_lakes', TRUE)
-
+;
 -- UNIONALL
 
 INSERT INTO REGION (name, part_of_country)
@@ -890,6 +890,78 @@ SELECT p.ssn as ssn,
 from PERSON p cross join FEDERATION f cross join SPORT_CATEGORY sc
 order by random()
 limit 500000;
+
+--
+WITH name_cte AS (
+    SELECT
+        p1 || p2 || ' ' || s AS name
+    FROM (
+        VALUES
+            ('Sport'), ('Riverside'), ('Colonial'), ('National'), ('Central'), ('Olympic'),
+            ('Greenfield'), ('Mountain'), ('Lakeside'), ('City'), ('Victory'), ('Heritage'),
+            ('Liberty'), ('Sunset'), ('Eastside'), ('West End'), ('North Park'), ('South Gate'),
+            ('Alpha'), ('Golden Arch'), ('Springfield'), ('Mountain Side'), ('Sea Bay'),
+            ('Flounder'), ('John Doe'), ('Mary Jay'), ('Simon Petrikov'), ('Jane Sandansi')
+    ) AS sufix(p1)
+    CROSS JOIN (
+        VALUES
+            (' Hall'), (' Grounds'), (' Stripe'), (' Kingson''s'), (' Calling'), (''),
+            (' Fright'), (' Pirate'), (' Comb')
+    ) AS midfix(p2)
+    CROSS JOIN (
+        VALUES
+            ('Field'), ('Stadium'), ('Track'), ('Ring'), ('Arena'), ('Court'), ('Grounds'),
+            ('Complex'), ('Park'), ('Center'), ('Dome'), ('Pitch'), ('Plaza')
+    ) AS suffixes(s)
+    ORDER BY random()
+),
+address_cte AS (
+    SELECT p1 || ' ' || p2 || ' ' || s || ' No.' || random(1, 100)::int4 as name
+    FROM (
+        VALUES
+        ('Main'), ('Mane'), ('Nikola'), ('Somber'), ('Dreamy'), ('Second'),
+        ('Calvin'), ('Jenny'), ('Maria'), ('Loiter'), ('Tornado'), ('Big'),
+        ('Small'), ('Central'), ('Outer'), ('Piggy'), ('Bronze'), ('San'),
+        ('Tourist'), ('Los'), ('Part'), ('Ginger'), ('Mary'), ('Drury'),
+        ('Cactus'), ('Palm'), ('Secret'), ('Jimmy'), ('Tim'), ('Magnus'),
+        ('Third'), ('Fifth'), ('Prime'), ('Alternative'), ('Void'), ('Summer')
+    )  first_name(p1)
+    CROSS JOIN (
+        VALUES
+        ('Way'), ('Branch'), ('Tesla'), ('Carbon'), ('Stoker'), ('Shore'), ('Bettle'),
+        ('Bench'), ('Static'), ('Quarter'), ('Third'), ('Jay'), ('Parrot'), ('Gofer'),
+        ('Single'), ('Band'), ('Gain'), ('Tribe'), ('Sting'), ('Silver'), ('Gold')
+    ) second_name(p2)
+    CROSS JOIN (
+        VALUES
+        ('Street'), ('Road'), ('Boulevard'), ('Alley'), ('Path'), ('Walk'), ('Lane'),
+        ('Park')
+    ) sufix(s)
+    ORDER BY random()
+)
+INSERT INTO location (country_id, name, capacity, address)
+    SELECT c.id as country_id,
+           loc_data.name as name,
+           random(2, 500)::int4 * 100 as capacity,
+           loc_data.adr as address
+    FROM (
+        SELECT
+            id,
+            floor(random(2, 30)) as loc_count
+        FROM country
+     ) as c
+    CROSS JOIN LATERAL (
+        SELECT
+            name_cte.name as name,
+            address_t.name as adr
+        FROM name_cte
+        CROSS JOIN
+            (SELECT * FROM address_cte ORDER BY random() LIMIT c.loc_count*3) as address_t
+        ORDER BY random()
+        LIMIT c.loc_count
+    ) as loc_data
+ON CONFLICT (country_id, name) DO NOTHING;
+;
 
 
 -- Remove temporary tables
