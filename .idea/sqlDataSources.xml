@@ -18,9 +18,11 @@
           <option name="id" value="6bb238a0-58fc-4e79-8da1-907984df28dc" />
           <option name="name" value="DDL data source" />
           <option name="dbmsName" value="POSTGRES" />
+          <option name="inlineFilter" value="file[proekt]:DataFileUsed/*" />
           <option name="urls">
             <array>
               <option value="file://$PROJECT_DIR$/IRSON.ddl" />
+              <option value="file://$PROJECT_DIR$/data.ddl" />
             </array>
           </option>
           <option name="outLayout" value="File per object by schema.groovy" />
