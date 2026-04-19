@@ -1436,7 +1436,7 @@ ON CONFLICT (federation_id, club_id) DO NOTHING;
 INSERT INTO NATIONAL_LEAGUE (federation_id, name, date_started, date_disbanded, region_id)
 SELECT nf.id as federation_id,
        s.name || ' League of ' || c.name as name,
-       (now() - interval '700 years' * random())::date as start_date,
+       (now() - interval '80 years' * random())::date as start_date,
         CASE
             WHEN random() < 0.3 THEN NULL
             ELSE (now() + interval '20 year' * random())::date
@@ -1463,9 +1463,18 @@ cross join generate_series(0, 999) as sesonNumber
 where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_started
         and (nl.date_started + (interval '1 year' * sesonNumber))::date < now()::date
         and (Case
-            when nl.date_started is not null
+            when nl.date_disbanded is not null
             then (nl.date_started + (interval '1 year' * sesonNumber))::date <= nl.date_disbanded
             else True End
             );
+--
+
+INSERT INTO REFEREE(ssn, federation_id, sport_category_id)
+SELECT p.ssn as ssn,
+       f.id as federation_id,
+       sc.id as sport_category_id
+from PERSON p cross join FEDERATION f cross join SPORT_CATEGORY sc
+order by random()
+limit 500000;
 
 
