@@ -878,13 +878,14 @@ where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_sta
             else True End
             );
 
-INSERT INTO REFEREE(ssn, federation_id, sport_category_id)
-SELECT p.ssn as ssn,
-       f.id as federation_id,
-       sc.id as sport_category_id
-from PERSON p cross join FEDERATION f cross join SPORT_CATEGORY sc
-order by random()
-limit 500000;
+-- TODO CHANGE
+-- INSERT INTO REFEREE(ssn, federation_id, sport_category_id)
+-- SELECT p.ssn as ssn,
+--        f.id as federation_id,
+--        sc.id as sport_category_id
+-- from PERSON p cross join FEDERATION f cross join SPORT_CATEGORY sc
+-- order by random()
+-- limit 500000;
 
 --
 WITH name_cte AS (
@@ -956,4 +957,57 @@ INSERT INTO location (country_id, name, capacity, address)
         LIMIT c.loc_count
     ) as loc_data
 ON CONFLICT (country_id, name) DO NOTHING;
+;
+--
+
+INSERT INTO sport_team(club_id, name)
+    with club_team_cte as (
+        SELECT DISTINCT
+            sc.id  as club_id,
+            LEFT(sc.name, 20) ||
+            CASE
+               WHEN length(sc.name) > 20 THEN '… '
+               ELSE ' '
+            END ||
+            CASE
+               WHEN cat.gender = 'M' THEN 'Man''s '
+               ELSE 'Woman''s '
+            END ||
+            s.name as team_name
+        FROM sport_club as sc
+            JOIN federation f
+                 on f.id = sc.federation_id
+            JOIN SPORT as s
+                 on s.id = f.sport_id
+            JOIN sport_category as cat
+                 on s.id = cat.sport_id
+        WHERE NOT sc.is_national_representation
+    )
+    SELECT *
+    FROM club_team_cte as ct
+    WHERE length(ct.team_name) <= 40
+ON CONFLICT DO NOTHING
+;
+
+INSERT INTO sport_team(club_id, name)
+    select distinct
+    sc.id,
+       CASE
+           WHEN cat.gender = 'M' THEN 'Men''s '
+           ELSE 'Women''s '
+       END ||
+       s.name || ' - ' || country.name
+fROM sport_club as sc
+         JOIN federation f
+              on f.id = sc.federation_id
+         JOIN national_federation nf
+              on nf.id = f.id
+         JOIN country
+              on country.id = nf.country_id
+         JOIN SPORT as s
+              on s.id = f.sport_id
+         JOIN sport_category as cat
+              on s.id = cat.sport_id
+WHERE sc.is_national_representation
+ON CONFLICT DO NOTHING
 ;
