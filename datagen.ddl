@@ -608,11 +608,6 @@ from NATIONAL_FEDERATION nf
 WHERE length('National ' || s.name || ' Team of ' || c.name) <= 40
 ON CONFLICT DO NOTHING;
 
-CREATE TABLE IF NOT EXISTS temp_clubs_names (
-    id      bigserial primary key,
-    name text
-);
-
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_clubs_names (
     id      bigserial primary key,
     name text
@@ -877,16 +872,6 @@ where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_sta
             then (nl.date_started + (interval '1 year' * sesonNumber))::date <= nl.date_disbanded
             else True End
             );
-
--- TODO CHANGE
--- INSERT INTO REFEREE(ssn, federation_id, sport_category_id)
--- SELECT p.ssn as ssn,
---        f.id as federation_id,
---        sc.id as sport_category_id
--- from PERSON p cross join FEDERATION f cross join SPORT_CATEGORY sc
--- order by random()
--- limit 500000;
-
 --
 WITH name_cte AS (
     SELECT
@@ -1011,3 +996,106 @@ fROM sport_club as sc
 WHERE sc.is_national_representation
 ON CONFLICT DO NOTHING
 ;
+--
+DO $$
+DECLARE
+    coach_count int;
+    coach_percent float DEFAULT 0.2;
+    referee_count int;
+    referee_percent float DEFAULT 0.1;
+BEGIN
+    -- Shuffling person table
+    CREATE TEMPORARY TABLE IF NOT EXISTS
+        person_rng ( ssn char(13) );
+
+    truncate person_rng;
+
+    INSERT INTO person_rng(ssn)
+        SELECT ssn
+        FROM person
+        ORDER BY random()
+    LIMIT 100000 -- TODO REMOVE! TEMPORARY FOR TESTING
+    ;
+
+    -- Calculating counts
+    SELECT
+        floor(COUNT(*) * coach_percent),
+        floor(COUNT(*) * referee_percent)
+        INTO coach_count, referee_count
+    FROM person_rng;
+
+    RAISE NOTICE 'coach_count=% referee_count=%', coach_count, referee_count;
+
+    -- Generating COACH
+    INSERT INTO coach(ssn, sport_category_id, federation_id)
+        SELECT
+            p.ssn,
+            cf.cat_id,
+            cf.fed_id
+        FROM (
+           SELECT ssn
+            FROM person_rng
+          --   OFFSET 0
+            LIMIT coach_count
+         ) p
+        CROSS JOIN LATERAL (
+            SELECT
+                f.id as fed_id,
+                c.id as cat_id
+            FROM federation f
+            JOIN sport_category c
+                on f.sport_id = c.sport_id
+            WHERE p.ssn IS NOT NULL
+            ORDER BY random()
+            LIMIT 1
+        ) cf
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE 'Coach table size %', (SELECT COUNT(*) FROM coach);
+
+    -- Generating REFEREE
+    INSERT INTO referee(ssn, federation_id, sport_category_id)
+        SELECT
+            p.ssn,
+            c.fed_id,
+            c.cat_id
+        FROM (
+            SELECT ssn
+            FROM person_rng
+            OFFSET coach_count
+            LIMIT referee_count
+        ) p
+        CROSS JOIN LATERAL (
+            SELECT
+                f.id as fed_id,
+                c.id as cat_id
+            FROM federation f
+            JOIN sport_category c
+                on f.sport_id = c.sport_id
+            WHERE p.ssn IS NOT NULL
+            ORDER BY random()
+            LIMIT 1
+        ) c
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE 'Referee table size %', (SELECT COUNT(*) FROM referee);
+
+    -- Generating SPORTSPERSON
+    INSERT INTO sportsperson(ssn, sport_category_id)
+        SELECT
+            p.ssn, cat.id
+        FROM (
+           SELECT ssn
+            FROM person_rng
+            OFFSET coach_count+referee_count
+--             LIMIT coach_count
+         ) p
+        CROSS JOIN LATERAL (
+            SELECT id
+            FROM sport_category
+            WHERE p.ssn IS NOT NULL
+            ORDER BY random()
+            LIMIT 1
+        ) cat
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE 'Sportsperson table size %', (SELECT COUNT(*) FROM sportsperson);
+END;
+$$;

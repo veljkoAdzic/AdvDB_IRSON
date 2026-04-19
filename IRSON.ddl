@@ -205,6 +205,7 @@ CREATE TABLE SPONSORSHIP (
     amount        int4 NOT NULL,
 
     CONSTRAINT amount_c CHECK ( amount > 0 ),
+    CONSTRAINT date_c CHECK ( valid_date_range(start_date, end_date) ),
     CONSTRAINT team_fk FOREIGN KEY (sport_team_id) REFERENCES SPORT_TEAM (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT sponsor_fk FOREIGN KEY (sponsor_id) REFERENCES SPONSOR (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
@@ -564,6 +565,3 @@ CREATE TRIGGER trg_limit_referee_daily_duels
 BEFORE INSERT OR UPDATE ON REFEREEING_DUEL
 FOR EACH ROW
 EXECUTE FUNCTION check_referee_availability();
-
-
--- Temp Tables
