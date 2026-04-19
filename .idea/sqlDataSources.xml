@@ -22,7 +22,7 @@
           <option name="urls">
             <array>
               <option value="file://$PROJECT_DIR$/IRSON.ddl" />
-              <option value="file://$PROJECT_DIR$/data.ddl" />
+              <option value="file://$PROJECT_DIR$/datagen.ddl" />
             </array>
           </option>
           <option name="outLayout" value="File per object by schema.groovy" />

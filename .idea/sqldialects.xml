@@ -3,6 +3,6 @@
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/DataFileUsed" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/IRSON.ddl" dialect="PostgreSQL" />
-    <file url="file://$PROJECT_DIR$/data.ddl" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/datagen.ddl" dialect="PostgreSQL" />
   </component>
 </project>

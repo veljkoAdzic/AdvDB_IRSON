@@ -477,36 +477,21 @@ VALUES
 ('Men''s Kickboxing – K1 Rules',      40,'M',9,'Knees + kicks + punches, 3×3 min',          1,3,0,1),
 ('Women''s Kickboxing – K1 Rules',    40,'F',9,'Knees + kicks + punches, 3×3 min',          1,3,0,1);
 
-
-CREATE TABLE IF NOT EXISTS temp_male_names (
-    id   bigserial primary key,
-    name text
-);
-
-CREATE TABLE IF NOT EXISTS temp_female_names (
-    id   bigserial primary key,
-    name text
-);
-
-CREATE TABLE IF NOT EXISTS temp_surnames (
-    id      bigserial primary key,
-    surname text
-);
-
-COPY temp_male_names (id, name)
-FROM 'C:/Users/Lenovo/Desktop/Fakultet-Ja/Fakultet/NapredniBazi/boy_names_2024.csv'
-DELIMITER ','
-CSV HEADER;
-
-COPY temp_female_names (id, name)
-FROM 'C:/Users/Lenovo/Desktop/Fakultet-Ja/Fakultet/NapredniBazi/girl_names_2024.csv'
-DELIMITER ','
-CSV HEADER;
-
-COPY temp_surnames (surname)
-FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\surnames.txt'
-DELIMITER ','
-CSV HEADER;
+-- TODO Fix non local support
+-- COPY temp_male_names (id, name)
+-- FROM 'C:/Users/Lenovo/Desktop/Fakultet-Ja/Fakultet/NapredniBazi/boy_names_2024.csv'
+-- DELIMITER ','
+-- CSV HEADER;
+--
+-- COPY temp_female_names (id, name)
+-- FROM 'C:/Users/Lenovo/Desktop/Fakultet-Ja/Fakultet/NapredniBazi/girl_names_2024.csv'
+-- DELIMITER ','
+-- CSV HEADER;
+--
+-- COPY temp_surnames (surname)
+-- FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\surnames.txt'
+-- DELIMITER ','
+-- CSV HEADER;
 
 
 WITH male_names AS (
@@ -635,10 +620,11 @@ CREATE TABLE IF NOT EXISTS temp_clubs_names (
     name text
 );
 
-COPY temp_clubs_names (name)
-FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\clubs.txt'
-DELIMITER ','
-CSV HEADER;
+-- TODO Fix no nlocal issue
+-- COPY temp_clubs_names (name)
+-- FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\clubs.txt'
+-- DELIMITER ','
+-- CSV HEADER;
 
 INSERT INTO SPORT_CLUB (federation_id, name, is_national_representation, country_id)
 SELECT federation_id, name, is_national_representation, country_id
@@ -692,12 +678,17 @@ VALUES
   ('Iberia', FALSE), ('Nile_valley', FALSE),
   ('Cascadia', TRUE), ('Great_lakes', TRUE)
 
-UNION ALL
+-- UNIONALL
 
-SELECT c.name || '_North', TRUE FROM COUNTRY c
-UNION ALL SELECT c.name || '_South', TRUE FROM COUNTRY c
-UNION ALL SELECT c.name || '_East',  TRUE FROM COUNTRY c
-UNION ALL SELECT c.name || '_West',  TRUE FROM COUNTRY c;
+INSERT INTO REGION (name, part_of_country)
+    SELECT c.name || '_North', TRUE FROM COUNTRY c
+    UNION ALL
+    SELECT c.name || '_South', TRUE FROM COUNTRY c
+    UNION ALL
+    SELECT c.name || '_East',  TRUE FROM COUNTRY c
+    UNION ALL
+    SELECT c.name || '_West',  TRUE FROM COUNTRY c;
+
 
 --
 
@@ -710,3 +701,211 @@ JOIN REGION r ON r.name IN (
   c.name || '_East',
   c.name || '_West'
 );
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Nordic'
+  AND c.name IN ('Norway','Sweden','Finland','Denmark','Iceland');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Balkans'
+  AND c.name IN ('Serbia','Croatia','Bosnia','Slovenia','Montenegro',
+                 'Kosovo','Albania','North Macedonia','Bulgaria','Romania','Greece');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Maghreb'
+  AND c.name IN ('Morocco','Algeria','Tunisia','Libya','Mauritania');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Benelux'
+  AND c.name IN ('Belgium','Netherlands','Luxembourg');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Cono_sur'
+  AND c.name IN ('Argentina','Chile','Uruguay','Paraguay','Brazil');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Gcc'
+  AND c.name IN ('Saudi Arabia','UAE','Kuwait','Qatar','Bahrain','Oman');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Asean'
+  AND c.name IN ('Thailand','Vietnam','Indonesia','Malaysia','Philippines',
+                 'Singapore','Myanmar','Cambodia','Laos','Brunei');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Visegrad'
+  AND c.name IN ('Poland','Czech Republic','Slovakia','Hungary');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Baltic'
+  AND c.name IN ('Estonia','Latvia','Lithuania');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Andean'
+  AND c.name IN ('Colombia','Venezuela','Ecuador','Peru','Bolivia');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Ecowas'
+  AND c.name IN ('Nigeria','Ghana','Senegal','Mali','Burkina Faso','Guinea',
+                 'Benin','Niger','Togo','Sierra Leone','Liberia','Gambia',
+                 'Cape Verde','Mauritania');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Eac'
+  AND c.name IN ('Kenya','Tanzania','Uganda','Rwanda','Burundi','South Sudan');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Levant'
+  AND c.name IN ('Lebanon','Syria','Jordan','Israel','Palestine','Iraq');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Steppe'
+  AND c.name IN ('Kazakhstan','Kyrgyzstan','Tajikistan','Turkmenistan',
+                 'Uzbekistan','Mongolia');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Alpine'
+  AND c.name IN ('Switzerland','Austria','Slovenia');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Caribbean'
+  AND c.name IN ('Cuba','Jamaica','Haiti','Dominican Republic','Trinidad','Bahamas');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Anzac'
+  AND c.name IN ('Australia','New Zealand');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Saarc'
+  AND c.name IN ('India','Pakistan','Bangladesh','Nepal','Sri Lanka',
+                 'Bhutan','Maldives','Afghanistan');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Melanesia'
+  AND c.name IN ('Fiji');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Caucasus'
+  AND c.name IN ('Georgia','Armenia','Azerbaijan');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Central_america'
+  AND c.name IN ('Guatemala','Belize','El Salvador','Honduras',
+                 'Nicaragua','Costa Rica','Panama');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Iberia'
+  AND c.name IN ('Spain','Portugal','Andorra');
+
+INSERT INTO COUNTRY_REGION (country_id, region_id)
+SELECT c.id, r.id FROM COUNTRY c, REGION r
+WHERE r.name = 'Nile_valley'
+  AND c.name IN ('Egypt','Sudan','South Sudan','Ethiopia','Uganda');
+
+INSERT INTO COMPETITION_TYPE (type_label) VALUES
+-- League formats
+('National League'),
+('Regional League'),
+('Premier League'),
+('First Division'),
+('Second Division'),
+('Third Division'),
+('Youth League'),
+('Reserve League'),
+('Amateur League'),
+('Semi-Professional League'),
+-- Cup formats
+('National Cup'),
+('Regional Cup'),
+('Super Cup'),
+('League Cup'),
+('Charity Cup'),
+('Youth Cup'),
+('knockout Cup'),
+-- Tournament formats
+('Round Robin Tournament'),
+('Single Elimination Tournament'),
+('Double Elimination Tournament'),
+('Group Stage Tournament'),
+('International Tournament'),
+('Invitational Tournament'),
+('Youth Tournament'),
+('Indoor Tournament'),
+('Outdoor Tournament'),
+-- International formats
+('World Championship'),
+('Continental Championship'),
+('European Championship'),
+('Olympic Qualification Tournament'),
+('Friendly International'),
+('International Friendly Tournament'),
+--Other
+('Exhibition Match'),
+('All Star Game'),
+('Playoff Series'),
+('Promotion Playoff'),
+('Relegation Playoff');
+
+
+INSERT INTO SEASON (national_league_id, start_date, end_date)
+select nl.id as national_league_id,
+       (nl.date_started + (interval '1 year' * sesonNumber)):: date as start_date,
+       (nl.date_started + ((interval '1 year' *sesonNumber)+interval '10 months'))::date as end_date
+from NATIONAL_LEAGUE nl
+cross join generate_series(0, 999) as sesonNumber
+where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_started
+        and (nl.date_started + (interval '1 year' * sesonNumber))::date < now()::date
+        and (Case
+            when nl.date_disbanded is not null
+            then (nl.date_started + (interval '1 year' * sesonNumber))::date <= nl.date_disbanded
+            else True End
+            );
+
+INSERT INTO REFEREE(ssn, federation_id, sport_category_id)
+SELECT p.ssn as ssn,
+       f.id as federation_id,
+       sc.id as sport_category_id
+from PERSON p cross join FEDERATION f cross join SPORT_CATEGORY sc
+order by random()
+limit 500000;
+
+
+-- Remove temporary tables
+DO $$
+DECLARE t text;
+BEGIN
+    FOR t in (
+        SELECT table_schema || '.' || table_name
+        FROM information_schema.tables
+        WHERE table_type = 'BASE TABLE'
+            AND table_schema NOT IN ('pg_catalog', 'information_schema')
+            AND table_name LIKE 'temp_%'
+        ORDER BY table_schema, table_name
+    )
+    LOOP
+        EXECUTE 'DROP TABLE ' || t;
+    END LOOP;
+END;
+$$;
