@@ -608,14 +608,11 @@ from NATIONAL_FEDERATION nf
 WHERE length('National ' || s.name || ' Team of ' || c.name) <= 40
 ON CONFLICT DO NOTHING;
 
-
-
 CREATE TABLE IF NOT EXISTS temp_clubs_names (
     id      bigserial primary key,
     name text
 );
 
--- TODO Fix no nlocal issue
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_clubs_names (
     id      bigserial primary key,
     name text
@@ -625,11 +622,6 @@ COPY temp_clubs_names(name)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/clubs.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
-
--- COPY temp_clubs_names (name)
--- FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\clubs.txt'
--- DELIMITER ','
--- CSV HEADER;
 
 INSERT INTO SPORT_CLUB (federation_id, name, is_national_representation, country_id)
 SELECT federation_id, name, is_national_representation, country_id
@@ -683,7 +675,6 @@ VALUES
   ('Iberia', FALSE), ('Nile_valley', FALSE),
   ('Cascadia', TRUE), ('Great_lakes', TRUE)
 ;
--- UNIONALL
 
 INSERT INTO REGION (name, part_of_country)
     SELECT c.name || '_North', TRUE FROM COUNTRY c
@@ -693,7 +684,6 @@ INSERT INTO REGION (name, part_of_country)
     SELECT c.name || '_East',  TRUE FROM COUNTRY c
     UNION ALL
     SELECT c.name || '_West',  TRUE FROM COUNTRY c;
-
 
 --
 
