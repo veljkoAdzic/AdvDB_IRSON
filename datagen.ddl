@@ -99,41 +99,20 @@ INSERT INTO COUNTRY (name, abreviation) VALUES
 ('Uzbekistan', 'UZB'), ('Venezuela', 'VEN'), ('Vietnam', 'VIE'),
 ('Yemen', 'YEM'), ('Zambia', 'ZAM'), ('Zimbabwe', 'ZIM');
 
-INSERT INTO SPONSOR (name)
-SELECT DISTINCT
-    prefix || ' ' || industry || ' ' || suffix || ' ' || num
-FROM
-    (VALUES
-        ('Alpha'), ('Beta'), ('Gamma'), ('Delta'), ('Omega'),
-        ('Prime'), ('Elite'), ('Pro'), ('Max'), ('Ultra'),
-        ('Global'), ('Euro'), ('Trans'), ('Inter'), ('Neo'),
-        ('Apex'), ('Peak'), ('Summit'), ('Core'), ('Axis'),
-        ('Vega'), ('Nova'), ('Orion'), ('Atlas'), ('Titan'),
-        ('Zeus'), ('Ares'), ('Hermes'), ('Apollo'), ('Hera'),
-        ('Red'), ('Blue'), ('Green'), ('Black'), ('White'),
-        ('Gold'), ('Silver'), ('Iron'), ('Steel'), ('Fire')
-    ) AS p(prefix)
-CROSS JOIN
-    (VALUES
-        ('Sport'), ('Tech'), ('Energy'), ('Media'), ('Finance'),
-        ('Health'), ('Auto'), ('Food'), ('Travel'), ('Build'),
-        ('Trade'), ('Logic'), ('Vision'), ('Power'), ('Data'),
-        ('Net'), ('Air'), ('Sea'), ('Land'), ('Sky'),
-        ('Fit'), ('Run'), ('Play'), ('Win'), ('Race'),
-        ('Move'), ('Drive'), ('Boost'), ('Flex'), ('Gear')
-    ) AS i(industry)
-CROSS JOIN
-    (VALUES
-        ('Group'), ('Corp'), ('Ltd'), ('Inc'), ('Co'),
-        ('Hub'), ('Lab'), ('Plus'), ('One'), ('Pro')
-    ) AS s(suffix)
-CROSS JOIN
-    (VALUES
-        ('1'),('2'),('3'),('4'),('5'),
-        ('6'),('7'),('8'),('9'),('10')
-    ) AS n(num)
-WHERE length(prefix || ' ' || industry || ' ' || suffix || ' ' || num) <= 30
-LIMIT 10000;
+CREATE TEMPORARY TABLE temp_sponsor (
+    name text
+);
+
+COPY temp_sponsor(name)
+FROM PROGRAM
+'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/sponsors.csv"'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+INSERT INTO sponsor(name)
+    SELECT ts.name
+    FROM temp_sponsor as ts
+    WHERE LENGTH(ts.name) <= 30
+;
 
 INSERT INTO SPORT_CATEGORY
   (name, sport_id, gender, duration_minutes, specification,
@@ -477,21 +456,37 @@ VALUES
 ('Men''s Kickboxing – K1 Rules',      40,'M',9,'Knees + kicks + punches, 3×3 min',          1,3,0,1),
 ('Women''s Kickboxing – K1 Rules',    40,'F',9,'Knees + kicks + punches, 3×3 min',          1,3,0,1);
 
--- TODO Fix non local support
--- COPY temp_male_names (id, name)
--- FROM 'C:/Users/Lenovo/Desktop/Fakultet-Ja/Fakultet/NapredniBazi/boy_names_2024.csv'
--- DELIMITER ','
--- CSV HEADER;
---
--- COPY temp_female_names (id, name)
--- FROM 'C:/Users/Lenovo/Desktop/Fakultet-Ja/Fakultet/NapredniBazi/girl_names_2024.csv'
--- DELIMITER ','
--- CSV HEADER;
---
--- COPY temp_surnames (surname)
--- FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\surnames.txt'
--- DELIMITER ','
--- CSV HEADER;
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_male_names (
+    id   bigserial primary key,
+    name text
+);
+
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_female_names (
+    id   bigserial primary key,
+    name text
+);
+
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_surnames (
+    id      bigserial primary key,
+    surname text
+);
+
+COPY temp_male_names(name)
+FROM PROGRAM
+'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/boyNames.csv"'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+
+COPY temp_female_names(name)
+FROM PROGRAM
+'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/girlNames.csv"'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+COPY temp_surnames(surname)
+FROM PROGRAM
+'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/surnames.csv"'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
 
 
 WITH male_names AS (
@@ -621,6 +616,16 @@ CREATE TABLE IF NOT EXISTS temp_clubs_names (
 );
 
 -- TODO Fix no nlocal issue
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_clubs_names (
+    id      bigserial primary key,
+    name text
+);
+
+COPY temp_clubs_names(name)
+FROM PROGRAM
+'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/clubs.csv"'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
 -- COPY temp_clubs_names (name)
 -- FROM 'C:\Users\Lenovo\Desktop\Fakultet-Ja\Fakultet\NapredniBazi\clubs.txt'
 -- DELIMITER ','
@@ -962,22 +967,3 @@ INSERT INTO location (country_id, name, capacity, address)
     ) as loc_data
 ON CONFLICT (country_id, name) DO NOTHING;
 ;
-
-
--- Remove temporary tables
-DO $$
-DECLARE t text;
-BEGIN
-    FOR t in (
-        SELECT table_schema || '.' || table_name
-        FROM information_schema.tables
-        WHERE table_type = 'BASE TABLE'
-            AND table_schema NOT IN ('pg_catalog', 'information_schema')
-            AND table_name LIKE 'temp_%'
-        ORDER BY table_schema, table_name
-    )
-    LOOP
-        EXECUTE 'DROP TABLE ' || t;
-    END LOOP;
-END;
-$$;

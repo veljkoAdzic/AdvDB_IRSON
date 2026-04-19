@@ -565,23 +565,3 @@ EXECUTE FUNCTION check_referee_availability();
 
 
 -- Temp Tables
-
-CREATE TABLE IF NOT EXISTS temp_clubs_names (
-    id      bigserial primary key,
-    name text
-);
-
-CREATE TABLE IF NOT EXISTS temp_male_names (
-    id   bigserial primary key,
-    name text
-);
-
-CREATE TABLE IF NOT EXISTS temp_female_names (
-    id   bigserial primary key,
-    name text
-);
-
-CREATE TABLE IF NOT EXISTS temp_surnames (
-    id      bigserial primary key,
-    surname text
-);
