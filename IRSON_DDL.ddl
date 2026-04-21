@@ -118,7 +118,9 @@ CREATE TABLE NATIONAL_LEAGUE (
     date_started   date NOT NULL,
     date_disbanded date,
     region_id      int4,
+    sport_category_id int4,
     PRIMARY KEY (id),
+    CONSTRAINT scat_constraint FOREIGN KEY (sport_category_id) REFERENCES SPORT_CATEGORY(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT date_constraint CHECK ( valid_date_range(date_started, date_disbanded) ),
     CONSTRAINT nat_federation_fk FOREIGN KEY (federation_id) REFERENCES NATIONAL_FEDERATION (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT region_fk FOREIGN KEY (region_id) REFERENCES REGION (id) ON DELETE RESTRICT ON UPDATE CASCADE
