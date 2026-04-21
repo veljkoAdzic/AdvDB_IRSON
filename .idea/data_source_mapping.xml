@@ -3,5 +3,6 @@
   <component name="DataSourcePerFileMappings">
     <file url="file://$PROJECT_DIR$/IRSON.ddl" value="3b2b8146-cb9e-45b8-ab15-e88cec4a6f2e" />
     <file url="file://$PROJECT_DIR$/IRSON_DATA_GENERATION.sql" value="3b2b8146-cb9e-45b8-ab15-e88cec4a6f2e" />
+    <file url="file://$PROJECT_DIR$/IRSON_DDL.ddl" value="3b2b8146-cb9e-45b8-ab15-e88cec4a6f2e" />
   </component>
 </project>

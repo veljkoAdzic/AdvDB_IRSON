@@ -1007,6 +1007,70 @@ CROSS JOIN LATERAL (
     LIMIT 1
 ) nff;
 
+
+INSERT INTO NATIONAL_LEAGUE (federation_id, name, date_started, date_disbanded, region_id)
+select nf.id as federation_id,
+    s.name || ' League of ' || c.name as name,
+    (now() - interval '1 year' * (10 + floor(random() * 40)))::date as date_started,
+    CASE
+        WHEN random() < 0.5 THEN NULL
+        ELSE (now() - interval '1 year' * floor(random() * 5))::date
+    END as date_disbanded,
+    (
+        SELECT cr.region_id
+        FROM COUNTRY_REGION cr
+        WHERE cr.country_id = nf.country_id
+        ORDER BY random()
+        LIMIT 1
+    ) as region_id
+FROM NATIONAL_FEDERATION nf
+    join FEDERATION f ON f.id = nf.id
+    join SPORT s ON s.id = f.sport_id
+    JOIN COUNTRY c ON c.id = nf.country_id
+WHERE length(s.name || ' League of ' || c.name) <= 50
+ON CONFLICT DO NOTHING;
+
+INSERT INTO SPONSORSHIP (sport_team_id, sponsor_id, start_date, end_date, amount)
+SELECT st.id as sport_team_id,
+       s.id as sponsor_id,
+       (now() - interval '40 year' * random())::date as start_date,
+        CASE
+            WHEN random() < 0.3 THEN null
+            else (now() + interval '10 year' *random())::date
+        end as end_date,
+        (10000 + floor(random()*60000000))::int as amount
+from (
+    select id, row_number() over (order by random()) as rn, gs as offf
+    from SPORT_TEAM
+    cross join generate_series(1, 7) as gs
+     ) as st join
+    (
+    select id, row_number() over (order by random()) as rn
+    from SPONSOR
+    ) as s on s.rn = ((st.rn*st.offf-1) % (Select count(*) from SPONSOR) + 1)
+on conflict do nothing;
+
+INSERT INTO COMPETITION (type, organizer_federation_id, season_id, name, start_date, end_date)
+SELECT ct.id as type, f.id as organizer_federation_id, s.id as season_id,
+        sp.name || ' '|| ct.type_label || ' '|| extract(YEAR from s.start_date)::text as name,
+        s.start_date, s.end_date
+from (
+    select id, national_league_id,start_date, end_date, row_number() OVER (ORDER BY random()) AS rn
+    from SEASON
+    where end_date is not null
+     ) s
+    join NATIONAL_LEAGUE nl on s.national_league_id=nl.id
+    join FEDERATION f on nl.federation_id=f.id
+    join SPORT sp on sp.id = f.sport_id
+    join (
+        select id, type_label, row_number() OVER (ORDER BY random()) AS rn
+        from COMPETITION_TYPE
+) as ct ON ct.rn = ((s.rn - 1) % (SELECT COUNT(*) FROM COMPETITION_TYPE) + 1)
+WHERE length(sp.name || ' ' || ct.type_label || ' ' || EXTRACT(YEAR FROM s.start_date)::text) > 0
+    and length(sp.name || ' ' || ct.type_label || ' ' || EXTRACT(YEAR FROM s.start_date)::text)<=40
+limit 1000000
+on conflict do nothing;
+
 SELECT 'club_federation' AS tablename, COUNT(*) FROM club_federation UNION ALL
 SELECT 'coach', COUNT(*) FROM coach UNION ALL
 SELECT 'coaching_team', COUNT(*) FROM coaching_team UNION ALL
