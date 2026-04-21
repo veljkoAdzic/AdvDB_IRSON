@@ -997,6 +997,7 @@ WHERE sc.is_national_representation
 ON CONFLICT DO NOTHING
 ;
 
+-- Temp table with range values
 CREATE TEMPORARY TABLE person_roles_idxs AS
 SELECT
     1::int                       AS referee_min_idx,
@@ -1007,60 +1008,52 @@ SELECT
     COUNT(*)::int                AS sportsman_max_idx
 FROM person;
 
+-- random shuffle of person
 CREATE TEMPORARY TABLE person_roles AS
 SELECT
     ssn,
     row_number() OVER (ORDER BY random()) AS i
 FROM person;
 
+-- Get subset for referee
 CREATE TEMPORARY TABLE person_referee AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.referee_min_idx AND idx.referee_max_idx;
 
+-- get subset for coach
 CREATE TEMPORARY TABLE person_coach AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.coach_min_idx AND idx.coach_max_idx;
 
+-- get subset for sportsman
 CREATE TEMPORARY TABLE person_sportsman AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.sportsman_min_idx AND idx.sportsman_max_idx;
 
+-- Filling sportsperson table
 INSERT INTO sportsperson (ssn, sport_category_id)
 SELECT
-    p.ssn,
+    ps.ssn,
     cat.id
-FROM person p
-JOIN person_sportsman ps
-    ON p.ssn = ps.ssn
+-- FROM person p
+-- JOIN person_sportsman ps
+--     ON p.ssn = ps.ssn
+FROM person_sportsman ps
 CROSS JOIN LATERAL (
     SELECT id
     FROM sport_category
     ORDER BY random() * ps.i
     LIMIT 1
 ) AS cat;
-SELECT * FROM sportsperson;
+-- SELECT * FROM sportsperson;
 
-INSERT INTO sportsperson (ssn, sport_category_id)
-SELECT
-    p.ssn,
-    cat.id
-FROM person p
-JOIN person_sportsman ps
-    ON p.ssn = ps.ssn
-CROSS JOIN LATERAL (
-    SELECT id
-    FROM sport_category
-    ORDER BY random() * ps.i
-    LIMIT 1
-) AS cat;
-SELECT * FROM sportsperson;
-
+-- filling referee table
 INSERT INTO referee (ssn, federation_id, sport_category_id)
 SELECT
     p.ssn,
@@ -1086,8 +1079,9 @@ CROSS JOIN LATERAL (
     ORDER BY random() * ps.i
     LIMIT 1
 ) nff;
-SELECT * FROM referee;
+-- SELECT * FROM referee;
 
+-- Filling coach table
 INSERT INTO coach (ssn, federation_id, sport_category_id)
 SELECT
     p.ssn,
@@ -1113,4 +1107,4 @@ CROSS JOIN LATERAL (
     ORDER BY random() * ps.i
     LIMIT 1
 ) nff;
-SELECT * FROM coach;
+-- SELECT * FROM coach;
