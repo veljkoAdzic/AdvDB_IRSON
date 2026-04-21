@@ -1,5 +1,3 @@
--- Data Inserted
-
 INSERT INTO SPORT (name) VALUES
 ('Football'),
 ('Basketball'),
@@ -102,17 +100,14 @@ INSERT INTO COUNTRY (name, abreviation) VALUES
 CREATE TEMPORARY TABLE temp_sponsor (
     name text
 );
-
 COPY temp_sponsor(name)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/sponsors.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
-
 INSERT INTO sponsor(name)
     SELECT ts.name
     FROM temp_sponsor as ts
-    WHERE LENGTH(ts.name) <= 30
-;
+    WHERE LENGTH(ts.name) <= 30;
 
 INSERT INTO SPORT_CATEGORY
   (name, sport_id, gender, duration_minutes, specification,
@@ -456,39 +451,31 @@ VALUES
 ('Men''s Kickboxing – K1 Rules',      40,'M',9,'Knees + kicks + punches, 3×3 min',          1,3,0,1),
 ('Women''s Kickboxing – K1 Rules',    40,'F',9,'Knees + kicks + punches, 3×3 min',          1,3,0,1);
 
+-- KONVEKCIJA: NAJMLAD PERSON 15 GODISHEN NAJSTAR 70
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_male_names (
     id   bigserial primary key,
     name text
 );
-
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_female_names (
     id   bigserial primary key,
     name text
 );
-
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_surnames (
     id      bigserial primary key,
     surname text
 );
-
 COPY temp_male_names(name)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/boyNames.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
-
-
 COPY temp_female_names(name)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/girlNames.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
-
 COPY temp_surnames(surname)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/surnames.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
-
-
-
 WITH male_names AS (
     SELECT name, row_number() OVER (ORDER BY random()) AS rn
     FROM temp_male_names
@@ -514,15 +501,14 @@ FROM (
     SELECT
         mn.name as first_name,
         s.surname as last_name,
-        (now() - interval '70 years' * random())::date as date_of_birth,
+        ((now() - interval '15 years') - (random() * interval '55 years'))::date as date_of_birth,
         'M'as gender,
-        (floor(random() * 160) + 1)::int as country_id
+        (floor(random() * 165) + 1)::int as country_id
     FROM male_names mn
         CROSS JOIN surnames s
-    LIMIT 500000
+    LIMIT 1000000
 ) as data
 ON CONFLICT (ssn) DO NOTHING;
-
 WITH female_names AS (
     SELECT name, row_number() OVER (ORDER BY random()) AS rn
     FROM temp_female_names
@@ -548,16 +534,14 @@ FROM (
     SELECT
         mn.name as first_name,
         s.surname as last_name,
-        (now() - interval '70 years' * random())::date as date_of_birth,
+        ((now() - interval '15 years') - (random() * interval '55 years'))::date as date_of_birth,
         'F'as gender,
-        (floor(random() * 160) + 1)::int as country_id
+        (floor(random() * 165) + 1)::int as country_id
     FROM female_names mn
         CROSS JOIN surnames s
-    LIMIT 500000
+    LIMIT 1000000
 ) as data
 ON CONFLICT (ssn) DO NOTHING;
-
---
 
 INSERT INTO FEDERATION (sport_id, name)
 SELECT
@@ -567,9 +551,6 @@ FROM SPORT s
     cross join COUNTRY c
 WHERE length(s.name || ' Federation of ' || c.name) <=50
 ON CONFLICT (name) DO NOTHING;
-
---
-
 INSERT INTO FEDERATION (sport_id, name)
 SELECT id as sport_id,
        'International ' || name || ' Federation' AS name
@@ -580,8 +561,6 @@ INSERT INTO INTERNATIONAL_FEDERATION (id)
 SELECT id
 FROM FEDERATION
 WHERE name LIKE 'International%';
-
---
 
 INSERT INTO NATIONAL_FEDERATION (id, country_id, international_federation_id)
 SELECT f.id,
@@ -594,69 +573,109 @@ FROM FEDERATION f
     join INTERNATIONAL_FEDERATION inf on inf.id = ifF.id
 ON CONFLICT DO NOTHING;
 
---
-
-INSERT INTO SPORT_CLUB (federation_id, name, is_national_representation, country_id)
-select f.id as federation_id,
-       'National ' || s.name || ' Team of ' || c.name as name,
+INSERT INTO SPORT_CLUB (name, is_national_representation, country_id)
+select
+       ('National Representation Club of ' || c.abreviation) as name,
        TRUE as is_national_representation,
        c.id as country_id
-from NATIONAL_FEDERATION nf
-    join FEDERATION f on nf.id=f.id
-    join SPORT s on s.id=f.sport_id
-    join COUNTRY c on nf.country_id=c.id
-WHERE length('National ' || s.name || ' Team of ' || c.name) <= 40
+FROM COUNTRY c
+CROSS JOIN sport_category sc
+WHERE length('National Representation Club of' || c.abreviation) <= 40
 ON CONFLICT DO NOTHING;
-
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_clubs_names (
     id      bigserial primary key,
     name text
 );
-
 COPY temp_clubs_names(name)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/clubs.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
-
-INSERT INTO SPORT_CLUB (federation_id, name, is_national_representation, country_id)
-SELECT federation_id, name, is_national_representation, country_id
+INSERT INTO SPORT_CLUB (name, is_national_representation, country_id)
+SELECT name, is_national_representation, country_id
 FROM (
     SELECT
-        nf.id as federation_id,
         tcn.name as name,
         FALSE as is_national_representation,
-        nf.country_id as country_id
+        c.id as country_id
     FROM (
         SELECT name, row_number() OVER (ORDER BY random()) as rn
         FROM temp_clubs_names
         WHERE length(name) <= 40
     ) as tcn
-    JOIN (
+    CROSS JOIN LATERAL (
         SELECT
-            nf.id,
-            nf.country_id,
-            row_number() OVER (ORDER BY random()) AS rn
-        FROM NATIONAL_FEDERATION nf
-    ) as nf ON nf.rn = ((tcn.rn - 1) % (SELECT COUNT(*) FROM NATIONAL_FEDERATION) + 1) -- to help with put federations again on start
-    LIMIT 1000000
+            c.id
+        FROM COUNTRY c
+        ORDER BY random() * tcn.rn
+        LIMIT 1
+    ) as c
 ) as data
+LIMIT 20000
 ON CONFLICT (name, country_id) DO NOTHING;
 
-
---
-
-INSERT INTO CLUB_FEDERATION (federation_id, club_id, start_date, end_date)
-SELECT sc.federation_id,
+-- NACIONALNITE CLUBOVI IMAAT TIMOVI ZA SITE SPORTSKI KATEGORII TIMOVI
+INSERT INTO sport_team(club_id, name, sport_category_id)
+SELECT
        sc.id as club_id,
-       (now() - interval '50 years' * random())::date as start_date,
-        CASE
-            WHEN random() < 0.3 THEN NULL
-            ELSE (now() + interval '10 year' * random())::date
-        END as end_date
-from SPORT_CLUB sc
-ON CONFLICT (federation_id, club_id) DO NOTHING;
+       LEFT('NT ' || c.abreviation || ' ' || scat.name, 20) as name,
+       scat.id as sport_category_id
+FROM sport_club sc
+JOIN country c
+    ON c.id = sc.country_id
+CROSS JOIN sport_category scat
+WHERE sc.is_national_representation = TRUE
+    AND length(LEFT('NT ' || c.abreviation || ' ' || scat.name, 30)) <= 40;
+-- NENACIONALNITE CLUBOVI IMAAT TIMOVI ZA RANDOM 11 ILI 14/337 SPORTSKI KATEGORII
+INSERT INTO sport_team(club_id, name, sport_category_id)
+SELECT
+    sc.id AS club_id,
+    LEFT(sc.name || ' ' || scat.name, 20) AS name,
+    scat.id AS sport_category_id
+FROM sport_club sc
+JOIN country c ON c.id = sc.country_id
+CROSS JOIN LATERAL (
+    SELECT scat.id, scat.name
+    FROM sport_category scat
+    ORDER BY md5(sc.id::text || scat.id::text || random()::text)
+    LIMIT
+        CASE WHEN sc.id % 2 = 0 THEN 14
+        ELSE 11 END
+) AS scat
+WHERE sc.is_national_representation = FALSE
+    AND length(LEFT(sc.name || ' ' || scat.name, 20)) <= 40;
 
---
+-- NACIONALNITE CLUBOVI CHELNUVAAT VO SITE SPORTSKI FEDERACII VO TAA DRZHAVA SE ZACHLENILE PRED [40, 50] GOD
+INSERT INTO club_federation(federation_id, club_id, start_date, end_date)
+SELECT nf.id, sc.id, ((now() - interval '40 years') - (random() * interval '10 years'))::date as d, null
+FROM sport_club sc
+CROSS JOIN SPORT s
+JOIN national_federation nf
+    ON nf.country_id = sc.country_id
+WHERE sc.is_national_representation = TRUE
+ON CONFLICT (federation_id, club_id) DO NOTHING ;
+-- NENACIONALNITE CLUBOVI CHLENUVAAT VO SPORTSKI FEDERACII VO DRZHAVATA ZA KOI IMAAT TIMOVI PRED [30, 35] GOD
+-- 5% OD TIMOVITE SE POVLECHENI VO POSLEDNITE [5, 10] GODINI
+INSERT INTO club_federation(federation_id, club_id, start_date, end_date)
+SELECT nf.id, sc.id,
+       ((now() - interval '30 years') - (random() * interval '5 years'))::date AS start_date,
+       CASE
+           WHEN random() <= 0.05
+           THEN ((now() - interval '5 years') - (random() * interval '5 years'))::date
+       END AS end_date
+FROM sport_club sc
+JOIN sport_team st
+    ON st.club_id = sc.id
+JOIN sport_category scat
+    ON scat.id = st.sport_category_id
+JOIN SPORT s
+    ON s.id = scat.sport_id
+JOIN federation f
+    ON f.sport_id = s.id
+JOIN national_federation nf
+    ON nf.country_id = sc.country_id
+    AND f.id = nf.id
+WHERE sc.is_national_representation = FALSE
+ON CONFLICT (federation_id, club_id) DO NOTHING;
 
 INSERT INTO REGION (name, part_of_country)
 VALUES
@@ -668,9 +687,7 @@ VALUES
   ('Caribbean', FALSE), ('Anzac', FALSE), ('Saarc', FALSE),
   ('Melanesia', FALSE), ('Caucasus', FALSE), ('Central_america', FALSE),
   ('Iberia', FALSE), ('Nile_valley', FALSE),
-  ('Cascadia', TRUE), ('Great_lakes', TRUE)
-;
-
+  ('Cascadia', TRUE), ('Great_lakes', TRUE);
 INSERT INTO REGION (name, part_of_country)
     SELECT c.name || '_North', TRUE FROM COUNTRY c
     UNION ALL
@@ -679,8 +696,6 @@ INSERT INTO REGION (name, part_of_country)
     SELECT c.name || '_East',  TRUE FROM COUNTRY c
     UNION ALL
     SELECT c.name || '_West',  TRUE FROM COUNTRY c;
-
---
 
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id
@@ -691,124 +706,101 @@ JOIN REGION r ON r.name IN (
   c.name || '_East',
   c.name || '_West'
 );
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Nordic'
   AND c.name IN ('Norway','Sweden','Finland','Denmark','Iceland');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Balkans'
   AND c.name IN ('Serbia','Croatia','Bosnia','Slovenia','Montenegro',
                  'Kosovo','Albania','North Macedonia','Bulgaria','Romania','Greece');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Maghreb'
   AND c.name IN ('Morocco','Algeria','Tunisia','Libya','Mauritania');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Benelux'
   AND c.name IN ('Belgium','Netherlands','Luxembourg');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Cono_sur'
   AND c.name IN ('Argentina','Chile','Uruguay','Paraguay','Brazil');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Gcc'
   AND c.name IN ('Saudi Arabia','UAE','Kuwait','Qatar','Bahrain','Oman');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Asean'
   AND c.name IN ('Thailand','Vietnam','Indonesia','Malaysia','Philippines',
                  'Singapore','Myanmar','Cambodia','Laos','Brunei');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Visegrad'
   AND c.name IN ('Poland','Czech Republic','Slovakia','Hungary');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Baltic'
   AND c.name IN ('Estonia','Latvia','Lithuania');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Andean'
   AND c.name IN ('Colombia','Venezuela','Ecuador','Peru','Bolivia');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Ecowas'
   AND c.name IN ('Nigeria','Ghana','Senegal','Mali','Burkina Faso','Guinea',
                  'Benin','Niger','Togo','Sierra Leone','Liberia','Gambia',
                  'Cape Verde','Mauritania');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Eac'
   AND c.name IN ('Kenya','Tanzania','Uganda','Rwanda','Burundi','South Sudan');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Levant'
   AND c.name IN ('Lebanon','Syria','Jordan','Israel','Palestine','Iraq');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Steppe'
   AND c.name IN ('Kazakhstan','Kyrgyzstan','Tajikistan','Turkmenistan',
                  'Uzbekistan','Mongolia');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Alpine'
   AND c.name IN ('Switzerland','Austria','Slovenia');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Caribbean'
   AND c.name IN ('Cuba','Jamaica','Haiti','Dominican Republic','Trinidad','Bahamas');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Anzac'
   AND c.name IN ('Australia','New Zealand');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Saarc'
   AND c.name IN ('India','Pakistan','Bangladesh','Nepal','Sri Lanka',
                  'Bhutan','Maldives','Afghanistan');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Melanesia'
   AND c.name IN ('Fiji');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Caucasus'
   AND c.name IN ('Georgia','Armenia','Azerbaijan');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Central_america'
   AND c.name IN ('Guatemala','Belize','El Salvador','Honduras',
                  'Nicaragua','Costa Rica','Panama');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Iberia'
   AND c.name IN ('Spain','Portugal','Andorra');
-
 INSERT INTO COUNTRY_REGION (country_id, region_id)
 SELECT c.id, r.id FROM COUNTRY c, REGION r
 WHERE r.name = 'Nile_valley'
@@ -816,34 +808,13 @@ WHERE r.name = 'Nile_valley'
 
 INSERT INTO COMPETITION_TYPE (type_label) VALUES
 -- League formats
-('National League'),
-('Regional League'),
-('Premier League'),
-('First Division'),
-('Second Division'),
-('Third Division'),
-('Youth League'),
-('Reserve League'),
-('Amateur League'),
-('Semi-Professional League'),
+('National League 1'),
+('National League 2'),
+('National League 3'),
+('National League 4'),
 -- Cup formats
 ('National Cup'),
 ('Regional Cup'),
-('Super Cup'),
-('League Cup'),
-('Charity Cup'),
-('Youth Cup'),
-('knockout Cup'),
--- Tournament formats
-('Round Robin Tournament'),
-('Single Elimination Tournament'),
-('Double Elimination Tournament'),
-('Group Stage Tournament'),
-('International Tournament'),
-('Invitational Tournament'),
-('Youth Tournament'),
-('Indoor Tournament'),
-('Outdoor Tournament'),
 -- International formats
 ('World Championship'),
 ('Continental Championship'),
@@ -872,7 +843,7 @@ where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_sta
             then (nl.date_started + (interval '1 year' * sesonNumber))::date <= nl.date_disbanded
             else True End
             );
---
+
 WITH name_cte AS (
     SELECT
         p1 || p2 || ' ' || s AS name
@@ -942,62 +913,7 @@ INSERT INTO location (country_id, name, capacity, address)
         LIMIT c.loc_count
     ) as loc_data
 ON CONFLICT (country_id, name) DO NOTHING;
-;
---
 
-INSERT INTO sport_team(club_id, name)
-    with club_team_cte as (
-        SELECT DISTINCT
-            sc.id  as club_id,
-            LEFT(sc.name, 20) ||
-            CASE
-               WHEN length(sc.name) > 20 THEN '… '
-               ELSE ' '
-            END ||
-            CASE
-               WHEN cat.gender = 'M' THEN 'Man''s '
-               ELSE 'Woman''s '
-            END ||
-            s.name as team_name
-        FROM sport_club as sc
-            JOIN federation f
-                 on f.id = sc.federation_id
-            JOIN SPORT as s
-                 on s.id = f.sport_id
-            JOIN sport_category as cat
-                 on s.id = cat.sport_id
-        WHERE NOT sc.is_national_representation
-    )
-    SELECT *
-    FROM club_team_cte as ct
-    WHERE length(ct.team_name) <= 40
-ON CONFLICT DO NOTHING
-;
-
-INSERT INTO sport_team(club_id, name)
-    select distinct
-    sc.id,
-       CASE
-           WHEN cat.gender = 'M' THEN 'Men''s '
-           ELSE 'Women''s '
-       END ||
-       s.name || ' - ' || country.name
-fROM sport_club as sc
-         JOIN federation f
-              on f.id = sc.federation_id
-         JOIN national_federation nf
-              on nf.id = f.id
-         JOIN country
-              on country.id = nf.country_id
-         JOIN SPORT as s
-              on s.id = f.sport_id
-         JOIN sport_category as cat
-              on s.id = cat.sport_id
-WHERE sc.is_national_representation
-ON CONFLICT DO NOTHING
-;
-
--- Temp table with range values
 CREATE TEMPORARY TABLE person_roles_idxs AS
 SELECT
     1::int                       AS referee_min_idx,
@@ -1007,53 +923,39 @@ SELECT
     (COUNT(*) * 0.3)::int + 1    AS sportsman_min_idx,
     COUNT(*)::int                AS sportsman_max_idx
 FROM person;
-
--- random shuffle of person
 CREATE TEMPORARY TABLE person_roles AS
 SELECT
     ssn,
     row_number() OVER (ORDER BY random()) AS i
 FROM person;
-
--- Get subset for referee
 CREATE TEMPORARY TABLE person_referee AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.referee_min_idx AND idx.referee_max_idx;
-
--- get subset for coach
 CREATE TEMPORARY TABLE person_coach AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.coach_min_idx AND idx.coach_max_idx;
-
--- get subset for sportsman
 CREATE TEMPORARY TABLE person_sportsman AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.sportsman_min_idx AND idx.sportsman_max_idx;
-
--- Filling sportsperson table
 INSERT INTO sportsperson (ssn, sport_category_id)
 SELECT
-    ps.ssn,
+    p.ssn,
     cat.id
--- FROM person p
--- JOIN person_sportsman ps
---     ON p.ssn = ps.ssn
-FROM person_sportsman ps
+FROM person p
+JOIN person_sportsman ps
+    ON p.ssn = ps.ssn
 CROSS JOIN LATERAL (
     SELECT id
     FROM sport_category
     ORDER BY random() * ps.i
     LIMIT 1
 ) AS cat;
--- SELECT * FROM sportsperson;
-
--- filling referee table
 INSERT INTO referee (ssn, federation_id, sport_category_id)
 SELECT
     p.ssn,
@@ -1079,9 +981,6 @@ CROSS JOIN LATERAL (
     ORDER BY random() * ps.i
     LIMIT 1
 ) nff;
--- SELECT * FROM referee;
-
--- Filling coach table
 INSERT INTO coach (ssn, federation_id, sport_category_id)
 SELECT
     p.ssn,
@@ -1107,4 +1006,34 @@ CROSS JOIN LATERAL (
     ORDER BY random() * ps.i
     LIMIT 1
 ) nff;
--- SELECT * FROM coach;
+
+SELECT 'club_federation' AS tablename, COUNT(*) FROM club_federation UNION ALL
+SELECT 'coach', COUNT(*) FROM coach UNION ALL
+SELECT 'coaching_team', COUNT(*) FROM coaching_team UNION ALL
+SELECT 'competition', COUNT(*) FROM competition UNION ALL
+SELECT 'competition_type', COUNT(*) FROM competition_type UNION ALL
+SELECT 'country', COUNT(*) FROM country UNION ALL
+SELECT 'country_region', COUNT(*) FROM country_region UNION ALL
+SELECT 'duel', COUNT(*) FROM duel UNION ALL
+SELECT 'federation', COUNT(*) FROM federation UNION ALL
+SELECT 'international_federation', COUNT(*) FROM international_federation UNION ALL
+SELECT 'national_federation', COUNT(*) FROM national_federation UNION ALL
+SELECT 'national_league', COUNT(*) FROM national_league UNION ALL
+SELECT 'location', COUNT(*) FROM location UNION ALL
+SELECT 'person', COUNT(*) FROM person UNION ALL
+SELECT 'referee', COUNT(*) FROM referee UNION ALL
+SELECT 'refereeing_duel', COUNT(*) FROM refereeing_duel UNION ALL
+SELECT 'region', COUNT(*) FROM region UNION ALL
+SELECT 'score', COUNT(*) FROM score UNION ALL
+SELECT 'season', COUNT(*) FROM season UNION ALL
+SELECT 'season_sport_team', COUNT(*) FROM season_sport_team UNION ALL
+SELECT 'sponsor', COUNT(*) FROM sponsor UNION ALL
+SELECT 'sponsorship', COUNT(*) FROM sponsorship UNION ALL
+SELECT 'sport', COUNT(*) FROM sport UNION ALL
+SELECT 'sport_category', COUNT(*) FROM sport_category UNION ALL
+SELECT 'sport_club', COUNT(*) FROM sport_club UNION ALL
+SELECT 'sport_team', COUNT(*) FROM sport_team UNION ALL
+SELECT 'sportsperson', COUNT(*) FROM sportsperson UNION ALL
+SELECT 'sportsperson_contract', COUNT(*) FROM sportsperson_contract UNION ALL
+SELECT 'team_roster', COUNT(*) FROM team_roster
+ORDER BY tablename;
