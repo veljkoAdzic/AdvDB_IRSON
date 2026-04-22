@@ -7,13 +7,13 @@ $$;
 
 CREATE TABLE SPORT (
   id             SERIAL NOT NULL,
-  name           varchar(30) NOT NULL,
+  name           varchar(80) NOT NULL,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE SPORT_CATEGORY (
     id            SERIAL NOT NULL,
-    name          varchar(60) NOT NULL,
+    name          varchar(80) NOT NULL,
     sport_id      int4 NOT NULL,
     gender        char(1) NOT NULL,
     duration_minutes INTEGER CHECK (duration_minutes BETWEEN 0 AND 999) NOT NULL,
@@ -29,20 +29,20 @@ CREATE TABLE SPORT_CATEGORY (
 
 CREATE TABLE COUNTRY (
   id          SERIAL NOT NULL,
-  name        varchar(50) NOT NULL,
+  name        varchar(80) NOT NULL,
   abreviation varchar(5) NOT NULL,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE SPONSOR (
   id   SERIAL NOT NULL,
-  name varchar(30) NOT NULL UNIQUE,
+  name varchar(80) NOT NULL UNIQUE,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE COMPETITION_TYPE (
     id         SERIAL NOT NULL,
-    type_label varchar(70) NOT NULL,
+    type_label varchar(80) NOT NULL,
     PRIMARY KEY (id)
 );
 
@@ -62,7 +62,7 @@ CREATE TABLE PERSON (
 CREATE TABLE FEDERATION (
     id       SERIAL NOT NULL,
     sport_id int4 NOT NULL,
-    name     varchar(50) NOT NULL,
+    name     varchar(80) NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT unique_federation_name UNIQUE (name),
     CONSTRAINT sport_fk FOREIGN KEY (sport_id) REFERENCES SPORT (id) ON DELETE RESTRICT ON UPDATE CASCADE
@@ -87,9 +87,9 @@ CREATE TABLE NATIONAL_FEDERATION (
 CREATE TABLE LOCATION (
     id         SERIAL NOT NULL,
     country_id int4 NOT NULL,
-    name       varchar(50) NOT NULL,
+    name       varchar(150) NOT NULL,
     capacity   int4 NOT NULL,
-    address    varchar(100) NOT NULL,
+    address    varchar(150) NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT check_capacity CHECK(capacity>0),
     CONSTRAINT country_fk FOREIGN KEY (country_id) REFERENCES COUNTRY (id) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -98,7 +98,7 @@ CREATE TABLE LOCATION (
 
 CREATE TABLE REGION (
     id              SERIAL NOT NULL,
-    name            varchar(70) NOT NULL,
+    name            varchar(150) NOT NULL,
     part_of_country bool NOT NULL,
     PRIMARY KEY (id)
 );
@@ -114,7 +114,7 @@ CREATE TABLE COUNTRY_REGION (
 CREATE TABLE NATIONAL_LEAGUE (
     id             SERIAL NOT NULL,
     federation_id  int4 NOT NULL,
-    name           varchar(50) NOT NULL,
+    name           varchar(150) NOT NULL,
     date_started   date NOT NULL,
     date_disbanded date,
     region_id      int4,
@@ -128,7 +128,7 @@ CREATE TABLE NATIONAL_LEAGUE (
 
 CREATE TABLE SPORT_CLUB (
     id                         SERIAL       NOT NULL,
-    name                       varchar(40)  NOT NULL,
+    name                       varchar(150) NOT NULL,
     is_national_representation bool         NOT NULL,
     country_id                 int4         NOT NULL,
     PRIMARY KEY (id),
@@ -137,11 +137,11 @@ CREATE TABLE SPORT_CLUB (
 );
 
 CREATE TABLE CLUB_FEDERATION (
-    federation_id int4 NOT NULL,
-    club_id       int4 NOT NULL,
-    start_date    date   NOT NULL,
+    id            SERIAL  PRIMARY KEY,
+    federation_id int4    NOT NULL,
+    club_id       int4    NOT NULL,
+    start_date    date    NOT NULL,
     end_date      date,
-    PRIMARY KEY (federation_id, club_id),
     CONSTRAINT club_federation_date_check CHECK ( valid_date_range(start_date, end_date) ),
     CONSTRAINT federation_fk FOREIGN KEY (federation_id) REFERENCES FEDERATION (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT club_fk FOREIGN KEY (club_id) REFERENCES SPORT_CLUB (id) ON DELETE RESTRICT ON UPDATE CASCADE
@@ -160,7 +160,7 @@ CREATE TABLE SEASON (
 CREATE TABLE SPORT_TEAM (
     id                    SERIAL NOT NULL,
     club_id               int4 NOT NULL,
-    name                  varchar(40) NOT NULL,
+    name                  varchar(150) NOT NULL,
     sport_category_id     int4 NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT spk FOREIGN KEY (sport_category_id) REFERENCES SPORT_CATEGORY ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -280,7 +280,7 @@ CREATE TABLE TEAM_ROSTER (
     duel_id    int4 NOT NULL,
     start_time time NOT NULL,
     end_time   time,
-    PRIMARY KEY (player_ssn,  team_id, duel_id),
+    PRIMARY KEY (player_ssn, team_id, duel_id),
     CONSTRAINT roster_date_check CHECK ( end_time IS NULL OR start_time < end_time),
     CONSTRAINT sportsperson_fk FOREIGN KEY (player_ssn) REFERENCES SPORTSPERSON (ssn) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT team_fk FOREIGN KEY (team_id) REFERENCES SPORT_TEAM (id) ON DELETE RESTRICT ON UPDATE CASCADE,
