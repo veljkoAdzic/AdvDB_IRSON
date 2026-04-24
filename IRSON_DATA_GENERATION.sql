@@ -97,7 +97,7 @@ INSERT INTO COUNTRY (name, abreviation) VALUES
 ('Uzbekistan', 'UZB'), ('Venezuela', 'VEN'), ('Vietnam', 'VIE'),
 ('Yemen', 'YEM'), ('Zambia', 'ZAM'), ('Zimbabwe', 'ZIM');
 
-CREATE TEMPORARY TABLE temp_sponsor (
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_sponsor (
     name text
 );
 COPY temp_sponsor(name)
@@ -107,7 +107,7 @@ WITH (FORMAT csv, HEADER true, DELIMITER ',');
 INSERT INTO sponsor(name)
     SELECT ts.name
     FROM temp_sponsor as ts
-    WHERE LENGTH(ts.name) <= 30;
+    WHERE LENGTH(ts.name) <= 80;
 
 INSERT INTO SPORT_CATEGORY
   (name, sport_id, gender, duration_minutes, specification,
@@ -476,6 +476,8 @@ COPY temp_surnames(surname)
 FROM PROGRAM
 'curl "https://raw.githubusercontent.com/veljkoAdzic/AdvDB_IRSON/refs/heads/master/DataFileUsed/surnames.csv"'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+
 WITH male_names AS (
     SELECT name, row_number() OVER (ORDER BY random()) AS rn
     FROM temp_male_names
@@ -501,7 +503,7 @@ FROM (
     SELECT
         mn.name as first_name,
         s.surname as last_name,
-        ((now() - interval '15 years') - (random() * interval '55 years'))::date as date_of_birth,
+        ((now() - interval '15 years') - (random() * interval '70 years'))::date as date_of_birth,
         'M'as gender,
         (floor(random() * 165) + 1)::int as country_id
     FROM male_names mn
@@ -534,7 +536,7 @@ FROM (
     SELECT
         mn.name as first_name,
         s.surname as last_name,
-        ((now() - interval '15 years') - (random() * interval '55 years'))::date as date_of_birth,
+        ((now() - interval '15 years') - (random() * interval '70 years'))::date as date_of_birth,
         'F'as gender,
         (floor(random() * 165) + 1)::int as country_id
     FROM female_names mn
@@ -549,13 +551,14 @@ SELECT
     s.name || ' Federation of ' || c.name as name
 FROM SPORT s
     cross join COUNTRY c
-WHERE length(s.name || ' Federation of ' || c.name) <=50
+WHERE length(s.name || ' Federation of ' || c.name) <=80
 ON CONFLICT (name) DO NOTHING;
 INSERT INTO FEDERATION (sport_id, name)
 SELECT id as sport_id,
        'International ' || name || ' Federation' AS name
 FROM SPORT
-ON CONFLICT (name) Do NOTHING;
+where length('International ' || name || ' Federation') <= 80
+ON CONFLICT Do NOTHING;
 
 INSERT INTO INTERNATIONAL_FEDERATION (id)
 SELECT id
@@ -580,7 +583,7 @@ select
        c.id as country_id
 FROM COUNTRY c
 CROSS JOIN sport_category sc
-WHERE length('National Representation Club of' || c.abreviation) <= 40
+WHERE length('National Representation Club of' || c.abreviation) <= 150
 ON CONFLICT DO NOTHING;
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_clubs_names (
     id      bigserial primary key,
@@ -600,7 +603,7 @@ FROM (
     FROM (
         SELECT name, row_number() OVER (ORDER BY random()) as rn
         FROM temp_clubs_names
-        WHERE length(name) <= 40
+        WHERE length(name) <= 150
     ) as tcn
     CROSS JOIN LATERAL (
         SELECT
@@ -624,7 +627,7 @@ JOIN country c
     ON c.id = sc.country_id
 CROSS JOIN sport_category scat
 WHERE sc.is_national_representation = TRUE
-    AND length(LEFT('NT ' || c.abreviation || ' ' || scat.name, 30)) <= 40;
+    AND length(LEFT('NT ' || c.abreviation || ' ' || scat.name, 30)) <= 150;
 -- NENACIONALNITE CLUBOVI IMAAT TIMOVI ZA RANDOM 11 ILI 14/337 SPORTSKI KATEGORII
 INSERT INTO sport_team(club_id, name, sport_category_id)
 SELECT
@@ -642,7 +645,7 @@ CROSS JOIN LATERAL (
         ELSE 11 END
 ) AS scat
 WHERE sc.is_national_representation = FALSE
-    AND length(LEFT(sc.name || ' ' || scat.name, 20)) <= 40;
+    AND length(LEFT(sc.name || ' ' || scat.name, 20)) <= 150;
 
 -- NACIONALNITE CLUBOVI CHELNUVAAT VO SITE SPORTSKI FEDERACII VO TAA DRZHAVA SE ZACHLENILE PRED [40, 50] GOD
 INSERT INTO club_federation(federation_id, club_id, start_date, end_date)
@@ -652,7 +655,7 @@ CROSS JOIN SPORT s
 JOIN national_federation nf
     ON nf.country_id = sc.country_id
 WHERE sc.is_national_representation = TRUE
-ON CONFLICT (federation_id, club_id) DO NOTHING ;
+ON CONFLICT DO NOTHING ;
 -- NENACIONALNITE CLUBOVI CHLENUVAAT VO SPORTSKI FEDERACII VO DRZHAVATA ZA KOI IMAAT TIMOVI PRED [30, 35] GOD
 -- 5% OD TIMOVITE SE POVLECHENI VO POSLEDNITE [5, 10] GODINI
 INSERT INTO club_federation(federation_id, club_id, start_date, end_date)
@@ -675,7 +678,7 @@ JOIN national_federation nf
     ON nf.country_id = sc.country_id
     AND f.id = nf.id
 WHERE sc.is_national_representation = FALSE
-ON CONFLICT (federation_id, club_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 INSERT INTO REGION (name, part_of_country)
 VALUES
@@ -829,20 +832,6 @@ INSERT INTO COMPETITION_TYPE (type_label) VALUES
 ('Promotion Playoff'),
 ('Relegation Playoff');
 
-INSERT INTO SEASON (national_league_id, start_date, end_date)
-select nl.id as national_league_id,
-       (nl.date_started + (interval '1 year' * sesonNumber)):: date as start_date,
-       (nl.date_started + ((interval '1 year' *sesonNumber)+interval '10 months'))::date as end_date
-from NATIONAL_LEAGUE nl
-cross join generate_series(0, 999) as sesonNumber
-where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_started
-        and (nl.date_started + (interval '1 year' * sesonNumber))::date < now()::date
-        and (Case
-            when nl.date_disbanded is not null
-            then (nl.date_started + (interval '1 year' * sesonNumber))::date <= nl.date_disbanded
-            else True End
-            );
-
 WITH name_cte AS (
     SELECT
         p1 || p2 || ' ' || s AS name
@@ -913,7 +902,7 @@ INSERT INTO location (country_id, name, capacity, address)
     ) as loc_data
 ON CONFLICT (country_id, name) DO NOTHING;
 
-CREATE TEMPORARY TABLE person_roles_idxs AS
+CREATE TEMPORARY TABLE if not exists person_roles_idxs AS
 SELECT
     1::int                       AS referee_min_idx,
     (COUNT(*) * 0.1)::int        AS referee_max_idx,
@@ -922,22 +911,22 @@ SELECT
     (COUNT(*) * 0.3)::int + 1    AS sportsman_min_idx,
     COUNT(*)::int                AS sportsman_max_idx
 FROM person;
-CREATE TEMPORARY TABLE person_roles AS
+CREATE TEMPORARY TABLE if not exists person_roles AS
 SELECT
     ssn,
     row_number() OVER (ORDER BY random()) AS i
 FROM person;
-CREATE TEMPORARY TABLE person_referee AS
+CREATE TEMPORARY TABLE if not exists person_referee AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.referee_min_idx AND idx.referee_max_idx;
-CREATE TEMPORARY TABLE person_coach AS
+CREATE TEMPORARY TABLE if not exists person_coach AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
 WHERE pr.i BETWEEN idx.coach_min_idx AND idx.coach_max_idx;
-CREATE TEMPORARY TABLE person_sportsman AS
+CREATE TEMPORARY TABLE if not exists person_sportsman AS
 SELECT pr.ssn, pr.i
 FROM person_roles pr
 CROSS JOIN person_roles_idxs idx
@@ -1026,9 +1015,23 @@ FROM NATIONAL_FEDERATION nf
     join FEDERATION f ON f.id = nf.id
     join SPORT s ON s.id = f.sport_id
     JOIN COUNTRY c ON c.id = nf.country_id
-WHERE length(s.name || ' League of ' || c.name) <= 50
+WHERE length(s.name || ' League of ' || c.name) <= 150
 ON CONFLICT DO NOTHING;
 
+INSERT INTO SEASON (national_league_id, start_date, end_date)
+select nl.id as national_league_id,
+       (nl.date_started + (interval '1 year' * sesonNumber)):: date as start_date,
+       (nl.date_started + ((interval '1 year' *sesonNumber)+interval '10 months'))::date as end_date
+from NATIONAL_LEAGUE nl
+cross join generate_series(0, 999) as sesonNumber
+where (nl.date_started + (interval '1 year' * sesonNumber))::date >= nl.date_started
+        and (nl.date_started + (interval '1 year' * sesonNumber))::date < (now()::date + interval '10 years')
+        and (Case
+            when nl.date_disbanded is not null
+            then (nl.date_started + (interval '1 year' * sesonNumber))::date <= nl.date_disbanded
+            else True End
+            )
+;
 INSERT INTO SPONSORSHIP (sport_team_id, sponsor_id, start_date, end_date, amount)
 SELECT st.id as sport_team_id,
        s.id as sponsor_id,
@@ -1052,11 +1055,16 @@ on conflict do nothing;
 INSERT INTO COMPETITION (type, organizer_federation_id, season_id, name, start_date, end_date)
 SELECT ct.id as type, f.id as organizer_federation_id, s.id as season_id,
         sp.name || ' '|| ct.type_label || ' '|| extract(YEAR from s.start_date)::text as name,
-        s.start_date, s.end_date
+        s.start_date,
+        CASE WHEN
+            s.end_date > now()::date and random() < 0.4
+            THEN NULL
+            ELSE s.end_date
+        END as end_date
 from (
     select id, national_league_id,start_date, end_date, row_number() OVER (ORDER BY random()) AS rn
     from SEASON
-    where end_date is not null
+--     where end_date is not null
      ) s
     join NATIONAL_LEAGUE nl on s.national_league_id=nl.id
     join FEDERATION f on nl.federation_id=f.id
@@ -1078,7 +1086,6 @@ CREATE TEMP TABLE IF NOT EXISTS sportsperson_temp AS
         floor(random()*7 + 1 )::int as num_contracts
     FROM sportsperson
     ORDER BY random()
---     LIMIT 10000 -- TODO REMOVE! FOR TESTING
 ;
 -- Table for non representative clubs
 CREATE TEMP TABLE tmp_clubs_by_category AS
@@ -1180,46 +1187,87 @@ DROP TABLE tmp_rep_clubs_by_category_country;
 
 -- Generating duels
 INSERT INTO DUEL (home_team_id, away_team_id, location_id, competition_id, start_time, sport_category_id)
-select home.home_id as home_team_id,
-       away.away_id as away_team_id,
-       l.id as location_id,
-       comp.id as competition_id,
-       ((comp.start_date + (random() * (comp.end_date - comp.start_date))::int)::timestamp
-        + (floor(random() * 24) || ' hours')::interval) as start_time,
-       home.category as sport_category_id
-from (
-    --home
-    SELECT st.id as home_id,
-           st.sport_category_id as category,
-           sc.country_id as county,
-           sc.is_national_representation as nationality,
-            row_number() OVER (ORDER BY random()) as rn
-    from SPORT_TEAM st
-    join SPORT_CLUB sc on st.club_id=sc.id
-     ) home join (
-    --away
-    SELECT st.id as away_id,
-           st.sport_category_id as category,
-           sc.country_id as county,
-           sc.is_national_representation as nationality,
-            row_number() OVER (ORDER BY random()) as rn
-    from SPORT_TEAM st
-    join SPORT_CLUB sc on st.club_id=sc.id
-     ) away on (home.category=away.category and home.home_id!=away.away_id and home.nationality=away.nationality
-         and away.rn = ((home.rn) % (SELECT COUNT(*) FROM SPORT_TEAM) + 1))
-    join (
-        -- location
-        select id, country_id
-        from LOCATION
-    ) l on l.country_id = home.county join (
-    --competition
-        select c.id, c.start_date, c.end_date, f.sport_id
-        from COMPETITION c
-        join FEDERATION f on c.organizer_federation_id=f.id
-            where end_date is not null
-    ) comp on comp.sport_id=(select sport_id from SPORT_CATEGORY
-                                       where id = home.category)
-LIMIT 10000000
+(
+    select home.home_id as home_team_id,
+           away.away_id as away_team_id,
+           l.id as location_id,
+           comp.id as competition_id,
+           ((comp.start_date + (random() * (comp.end_date - comp.start_date))::int)::timestamp
+            + (floor(random() * 24) || ' hours')::interval) as start_time,
+           home.category as sport_category_id
+    from (
+        --home
+        SELECT st.id as home_id,
+               st.sport_category_id as category,
+               sc.country_id as county,
+               sc.is_national_representation as nationality,
+                row_number() OVER (ORDER BY random()) as rn
+        from SPORT_TEAM st
+        join SPORT_CLUB sc on st.club_id=sc.id
+         ) home join (
+        --away
+        SELECT st.id as away_id,
+               st.sport_category_id as category,
+               sc.country_id as county,
+               sc.is_national_representation as nationality,
+                row_number() OVER (ORDER BY random()) as rn
+        from SPORT_TEAM st
+        join SPORT_CLUB sc on st.club_id=sc.id
+         ) away on (home.category=away.category and home.home_id!=away.away_id and home.nationality=away.nationality
+             and away.rn = ((home.rn) % (SELECT COUNT(*) FROM SPORT_TEAM) + 1))
+        join (
+            -- location
+            select id, country_id
+            from LOCATION
+        ) l on l.country_id = home.county join (
+        --competition
+            select c.id, c.start_date, c.end_date, f.sport_id
+            from COMPETITION c
+            join FEDERATION f on c.organizer_federation_id=f.id
+                where end_date is not null
+        ) comp on comp.sport_id=(select sport_id from SPORT_CATEGORY
+                                           where id = home.category)
+    LIMIT 1000000
+)
+UNION ALL
+(
+    select home.home_id as home_team_id,
+           away.away_id as away_team_id,
+           l.id as location_id,
+           NULL as competition_id,
+           (
+            now()::date + random() * interval '75 years'
+               - interval '70 years' + interval '8 hours'
+               + random() * interval '14 hour'
+           )::timestamp as start_time,
+           home.category as sport_category_id
+    from (
+        --home
+        SELECT st.id as home_id,
+               st.sport_category_id as category,
+               sc.country_id as county,
+               sc.is_national_representation as nationality,
+                row_number() OVER (ORDER BY random()) as rn
+        from SPORT_TEAM st
+        join SPORT_CLUB sc on st.club_id=sc.id
+         ) home join (
+        --away
+        SELECT st.id as away_id,
+               st.sport_category_id as category,
+               sc.country_id as county,
+               sc.is_national_representation as nationality,
+                row_number() OVER (ORDER BY random()) as rn
+        from SPORT_TEAM st
+        join SPORT_CLUB sc on st.club_id=sc.id
+         ) away on (home.category=away.category and home.home_id!=away.away_id and home.nationality=away.nationality
+             and away.rn = ((home.rn) % (SELECT COUNT(*) FROM SPORT_TEAM) + 1))
+        join (
+            -- location
+            select id, country_id
+            from LOCATION
+        ) l on l.country_id = home.county
+    LIMIT 500000
+)
 ON CONFLICT DO NOTHING
 ;
 
@@ -1268,84 +1316,6 @@ INSERT INTO REFEREEING_DUEL (referee_ssn, duel_id)
         AND r.rn = ((d.rn - 1) % r.cnt) + 1
     limit 4000000
 ON CONFLICT DO NOTHING;
-
--- TODO Make faster
--- Generating Team roster
--- INSERT INTO TEAM_ROSTER(player_ssn, team_id, duel_id, start_time, end_time)
--- with duel_comp as (
---     select
---         d.id as duel_id, d.sport_category_id,
---         d.home_team_id, d.away_team_id,
---         cp.start_date, cp.end_date,
---         h_t.club_id as home_club_id,
---         a_t.club_id as away_club_id
---     from duel d
---     join competition cp
---         on cp.id = d.competition_id
---     join sport_team h_t
---         on h_t.id = d.home_team_id
---     join sport_team a_t
---         on a_t.id = d.away_team_id
---
---     where d.competition_id IS NOT NULL
--- )
--- , players_home as (
---     select
---         d.duel_id,
---         sc.player_ssn,
---         ROW_NUMBER() OVER (PARTITION BY d.duel_id ORDER BY random()) AS rn
---         ,cat.team_capacity
---     from duel_comp as d
---     join sportsperson_contract sc
---         on sc.club_id = d.home_club_id
---     join sport_category cat
---         on cat.id = d.sport_category_id
---     where
---     sc.start_date < d.start_date and
---     (sc.end_date IS NULL OR sc.end_date > d.end_date)
---     ORDER BY random()
--- )
--- , players_away as (
---     select
---         d.duel_id,
---         sc.player_ssn,
---         ROW_NUMBER() OVER (PARTITION BY d.duel_id ORDER BY random()) AS rn,
---         cat.team_capacity
---     from duel_comp as d
---     join sportsperson_contract sc
---         on sc.club_id = d.away_club_id
---     join sport_category cat
---         on cat.id = d.sport_category_id
---     where
---     sc.start_date < d.start_date and
---     (sc.end_date IS NULL OR sc.end_date > d.end_date)
--- --     ORDER BY random()
--- )
--- SELECT
---     ph.player_ssn, d.home_team_id,
---     d.duel_id, d.start_date::timestamp::time, d.end_date::timestamp::time
--- from duel_comp as d
--- join (
---     Select *
---     from players_home
---     where rn <= team_capacity
--- ) ph
---     on ph.duel_id = d.duel_id
---
--- UNION ALL
---
--- SELECT
---     ph.player_ssn, d.away_team_id,
---     d.duel_id, d.start_date::timestamp::time, d.end_date::timestamp::time
--- from duel_comp as d
--- join (
---     Select *
---     from players_away
---     where rn <= team_capacity
--- ) ph
---     on d.duel_id = ph.duel_id
--- ON CONFLICT DO NOTHING
--- ;
 
 INSERT INTO TEAM_ROSTER(player_ssn, team_id, duel_id, start_time, end_time)
 WITH duel_info AS (
