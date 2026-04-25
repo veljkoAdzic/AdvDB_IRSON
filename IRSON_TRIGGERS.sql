@@ -1,4 +1,6 @@
+-- TRIGGERS
 
+--1
 CREATE OR REPLACE FUNCTION check_contract_club()
 RETURNS trigger AS $$
 DECLARE
@@ -46,6 +48,8 @@ BEFORE INSERT OR UPDATE ON sportsperson_contract
 FOR EACH ROW
 EXECUTE FUNCTION check_contract_club();
 
+
+--2
 CREATE OR REPLACE FUNCTION check_team_roster_contract()
 RETURNS trigger AS $$
 DECLARE
@@ -107,11 +111,14 @@ BEFORE INSERT OR UPDATE ON team_roster
 FOR EACH ROW
 EXECUTE FUNCTION check_team_roster_contract();
 
+
+--3
+--Change to compare sport_category_id from sport team no to go through federation
 CREATE OR REPLACE FUNCTION check_duel_validity()
 RETURNS TRIGGER AS $$
 DECLARE
     match_date DATE;
-    duel_sport_id INT;
+--     duel_sport_id INT;
 
     home_club_id INT;
     away_club_id INT;
@@ -124,12 +131,12 @@ DECLARE
 BEGIN
     match_date := NEW.start_time::DATE;
 
-    SELECT sport_id
-    INTO duel_sport_id
-    FROM sport_category
-    WHERE id = NEW.sport_category_id;
+--     SELECT sport_id
+--     INTO duel_sport_id
+--     FROM sport_category
+--     WHERE id = NEW.sport_category_id;
 
-    IF duel_sport_id IS NULL THEN
+    IF NEW.sport_category_id IS NULL THEN
         RAISE EXCEPTION 'Invalid sport category ID: %', NEW.sport_category_id;
     END IF;
 
@@ -183,10 +190,9 @@ BEGIN
 
     IF NOT EXISTS (
         SELECT 1
-        FROM sport_club c
-        JOIN federation f ON f.id = c.federation_id
-        WHERE c.id = home_club_id
-          AND f.sport_id = duel_sport_id
+        from sport_team st
+        where st.club_id = home_club_id
+            and st.sport_category_id=NEW.sport_category_id
     ) THEN
         RAISE EXCEPTION
             'Home team must play the same sport as the duel.';
@@ -194,10 +200,9 @@ BEGIN
 
     IF NOT EXISTS (
         SELECT 1
-        FROM sport_club c
-        JOIN federation f ON f.id = c.federation_id
-        WHERE c.id = away_club_id
-          AND f.sport_id = duel_sport_id
+        from sport_team st
+        where st.club_id = away_club_id
+            and st.sport_category_id=NEW.sport_category_id
     ) THEN
         RAISE EXCEPTION
             'Away team must play the same sport as the duel.';
@@ -212,6 +217,8 @@ BEFORE INSERT OR UPDATE ON DUEL
 FOR EACH ROW
 EXECUTE FUNCTION check_duel_validity();
 
+
+--4
 CREATE OR REPLACE FUNCTION check_referee_availability()
 RETURNS TRIGGER AS $$
 DECLARE
