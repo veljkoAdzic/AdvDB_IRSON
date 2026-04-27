@@ -363,3 +363,52 @@ FROM sportsperson sp
     left join score s on s.player_ssn=sp.ssn
 group by sp.ssn, p.first_name, p.last_name, c.name, sc.name
 order by total_score desc;
+
+---------------------10
+CREATE OR REPLACE VIEW sponsorship_leaderboard as
+SELECT s.id,
+       s.name as sponsor_name,
+       count(Distinct ss.sport_team_id) as teams_sponsored,
+       sum(ss.amount) as total_invested,
+       max(ss.amount) as largest_deal,
+       min(ss.amount) as smallest_deal,
+       count(CASE
+                WHEN ss.start_date<=now()::date and (ss.end_date is NULL or ss.end_date>now()::date)
+            THEN 1 END) as active_deals
+FROM sponsor s
+    join sponsorship ss on s.id =ss.sponsor_id
+group by s.id, s.name;
+
+----------------------11
+CREATE OR REPLACE VIEW player_carrer_history as
+SELECT sp.ssn,
+       p.first_name || ' ' || p.last_name as player_name,
+       p.date_of_birth,
+       c_from.name as nationality,
+       scategory.name as sport_category,
+       sc.name as club_name,
+       club_country.name as club_country,
+       spc.start_date as contract_start,
+       spc.end_date as contract_end,
+       CASE
+           WHEN spc.end_date is null THEN 'ACTIVE'
+           WHEN spc.end_date>now()::date THEN 'ACTIVE'
+       ELSE 'EXPIRED' end as contract_status,
+       spc.payout as annual_payout,
+       count(*) over (
+           partition by sp.ssn
+           ) as total_contracts,
+       sum(spc.payout) over(
+           partition by sp.ssn
+           ) as career_total_payout
+FROM sportsperson sp
+    join person p on p.ssn=sp.ssn
+    join country c_from on c_from.id=p.country_id
+    join sportsperson_contract spc on spc.player_ssn=sp.ssn
+    join sport_category scategory on scategory.id=sp.sport_category_id
+    join sport_club sc on sc.id = spc.club_id
+    join country club_country on club_country.id = sc.country_id
+order by sp.ssn, spc.start_date;
+
+
+
