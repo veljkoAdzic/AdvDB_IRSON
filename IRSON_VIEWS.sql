@@ -1,3 +1,102 @@
+-- CREATE OR REPLACE VIEW season_team_standings AS
+-- WITH duel_results AS (
+--     SELECT
+--         d.id AS duel_id,
+--         c.season_id AS season_id,
+--         d.home_team_id,
+--         d.away_team_id,
+--         spca.points_per_win,
+--         spca.points_per_draw,
+--         spca.points_per_losing,
+--         (SELECT COUNT(*)
+--          FROM SCORE s
+--          JOIN TEAM_ROSTER tr
+--              ON s.duel_id = tr.duel_id
+--             AND s.player_ssn = tr.player_ssn
+--             AND tr.team_id = d.home_team_id
+--         ) AS home_team_goals,
+--         (SELECT COUNT(*)
+--          FROM SCORE s
+--          JOIN TEAM_ROSTER tr
+--              ON s.duel_id = tr.duel_id
+--             AND s.player_ssn = tr.player_ssn
+--             AND tr.team_id = d.away_team_id
+--         ) AS away_team_goals
+--     FROM DUEL d
+--     JOIN COMPETITION c
+--         ON d.competition_id = c.id
+--        AND c.season_id = 1
+--     JOIN SPORT_CATEGORY spca
+--         ON spca.id = d.sport_category_id
+-- )
+-- SELECT
+--     t.id AS team_id,
+--     t.name AS team_name,
+--     dr.season_id,
+--     COUNT(*) AS matches_played,
+--     SUM(
+--         CASE
+--             WHEN (t.id = dr.home_team_id AND dr.home_team_goals > dr.away_team_goals)
+--               OR (t.id = dr.away_team_id AND dr.away_team_goals > dr.home_team_goals)
+--                 THEN dr.points_per_win
+--             WHEN dr.home_team_goals = dr.away_team_goals
+--                 THEN dr.points_per_draw
+--             ELSE dr.points_per_losing
+--         END
+--     ) AS total_points
+-- FROM SPORT_TEAM t
+-- JOIN duel_results dr
+--     ON t.id IN (dr.home_team_id, dr.away_team_id)
+-- GROUP BY t.id, t.name, dr.season_id
+-- ORDER BY total_points DESC;
+--
+--
+-- CREATE OR REPLACE VIEW get_duels AS
+-- SELECT
+--     d.id,
+--     d.start_time,
+--     ht.name AS home_team,
+--     at.name AS away_team,
+--     l.name AS location
+-- FROM DUEL d
+-- JOIN SPORT_TEAM ht ON ht.id = d.home_team_id
+-- JOIN SPORT_TEAM at ON at.id = d.away_team_id
+-- JOIN LOCATION l ON l.id = d.location_id
+-- LEFT JOIN COMPETITION c ON d.competition_id = c.id
+-- JOIN SPORT_CATEGORY sc ON d.sport_category_id = sc.id
+-- WHERE d.sport_category_id = 1
+--   AND d.competition_id = 1
+--   AND d.start_time > NOW()
+-- ORDER BY d.start_time ASC;
+--
+--
+-- CREATE OR REPLACE VIEW monthly_profit_for_team AS
+-- WITH monthly_income AS (
+--     SELECT COALESCE(SUM(amount), 0) AS total_income
+--     FROM SPONSORSHIP
+--     WHERE sport_team_id = 1
+--       AND start_date <= NOW()::date
+--       AND (end_date IS NULL OR end_date > NOW()::date + INTERVAL '30 days')
+-- ),
+-- monthly_spending AS (
+--     SELECT COALESCE(SUM(spso.payout), 0) AS total_spending
+--     FROM SPORTSPERSON_CONTRACT spso
+--     JOIN SPORT_CLUB sc ON sc.id = spso.club_id
+--     JOIN SPORT_TEAM st ON st.club_id = sc.id
+--     WHERE st.id = 1
+--       AND spso.start_date <= NOW()::date
+--       AND (spso.end_date IS NULL OR spso.end_date > NOW()::date + INTERVAL '30 days')
+-- )
+-- SELECT
+--     st.id,
+--     st.name,
+--     mi.total_income AS income,
+--     ms.total_spending AS spending,
+--     mi.total_income - ms.total_spending AS profit
+-- FROM monthly_income mi, monthly_spending ms
+-- JOIN SPORT_TEAM st ON st.id = 1;
+
+-------------1
 CREATE OR REPLACE VIEW duel_score AS
 SELECT
     d.id AS duel_id,
@@ -23,6 +122,7 @@ SELECT
     ) AS away_team_goals
 FROM DUEL d;
 
+--------------------2
 CREATE OR REPLACE VIEW season_team_standings AS
 SELECT
     t.id   AS team_id,
@@ -60,6 +160,7 @@ JOIN SPORT_CATEGORY sc
 GROUP BY t.id, t.name, c.season_id
 ORDER BY total_points DESC, (goals_scored - goals_conceded) DESC;
 
+---------------------------3
 CREATE OR REPLACE VIEW duel_history AS
 SELECT
     d.id            AS duel_id,
@@ -98,6 +199,7 @@ WHERE c.id        = 1
   AND d.start_time < NOW()
 ORDER BY d.start_time DESC;
 
+----------------------------4
 CREATE OR REPLACE VIEW monthly_profit_for_team AS
 WITH monthly_income AS (
     SELECT COALESCE(SUM(amount), 0) AS total_income
@@ -124,6 +226,8 @@ SELECT
 FROM monthly_income mi, monthly_spending ms
 JOIN SPORT_TEAM st ON st.id = 1;
 
+
+------------------5
 CREATE OR REPLACE VIEW free_locations_for_slots AS
 WITH time_slots AS (
     SELECT 1 AS slot_num, '2025-03-01 10:00:00'::timestamp AS slot_start, '2025-03-01 12:00:00'::timestamp AS slot_end
@@ -181,3 +285,129 @@ SELECT
 FROM ranked
 WHERE rank <= 3
 ORDER BY slot_num, capacity DESC;
+
+-------------------------6
+CREATE OR REPLACE VIEW top_scores_per_competiotion as
+SELECT d.competition_id,
+       s.player_ssn,
+       p.first_name || ' ' || p.last_name as player_name,
+       COUNT(*) as total_goals,
+       RANK() OVER (
+            PARTITION BY d.competition_id
+            ORDER BY COUNT(*) DESC
+       ) as rank
+FROM SCORE s
+    join Duel d on s.duel_id=d.id
+    join SPORTSPERSON sp on s.player_ssn=sp.ssn
+    join PERSON p on sp.ssn = p.ssn
+WHERE d.competition_id is not null
+group by d.competition_id, s.player_ssn, p.first_name, p.last_name;
+
+-----------------------------7
+CREATE OR REPLACE VIEW referee_workflow_summary as
+SELECT r.ssn as referee_ssn,
+       p.first_name || ' ' || p.last_name as referee_name,
+       c.name as country,
+       sc.name as sport_category_name,
+       COUNT(rd.duel_id) as total_duels_officiated,
+       MIN(d.start_time)::date as first_duel_date,
+       MAX(d.start_time)::date as last_duel_date
+FROM REFEREE r
+    join PERSON p on r.ssn=p.ssn
+    join COUNTRY c on c.id = p.country_id
+    join SPORT_CATEGORY sc on r.sport_category_id = sc.id
+    left join REFEREEING_DUEL rd on rd.referee_ssn = r.ssn
+    LEFT join DUEL d on d.id=rd.duel_id
+group by r.ssn, p.first_name, p.last_name, c.name, sc.name
+HAVING COUNT(rd.duel_id)>0
+ORDER BY total_duels_officiated DESC;
+
+----------------------8
+CREATE OR replace VIEW location_usage as
+SELECT l.id as location_id,
+       l.name as location_name,
+       l.capacity,
+       l.address,
+       c.name as country_name,
+       count(d.id) as total_duel_played,
+       MIN(d.start_time)::date as first_duel_date,
+       MAX(d.start_time)::date as last_duel_date
+FROM location l
+    join country c on l.country_id=c.id
+    left join Duel d on d.location_id=l.id
+GROUP BY l.id, l.name, l.capacity, l.address, c.name;
+
+------------------------9
+CREATE OR REPLACE VIEW player_duel_stats as
+SELECT sp.ssn,
+       p.first_name || ' ' || p.last_name as person_name,
+       c.name as country_name,
+       sc.name as sport_name,
+       count(Distinct tr.duel_id) as total_duels,
+       count(s.id) as total_score,
+       round(
+            AVG(
+                (extract(EPOCH from (coalesce(tr.end_time, tr.start_time+sc.duration_minutes * Interval '1 minute')-tr.start_time)))/60.0
+            ), 1
+       ) as avg_minutes_per_duel,
+       round(
+            sum(
+                (extract(EPOCH from (coalesce(tr.end_time, tr.start_time+sc.duration_minutes * Interval '1 minute')-tr.start_time)))/60.0
+            ),1
+       ) as total_minutes_played
+FROM sportsperson sp
+    join person p on sp.ssn=p.ssn
+    join country c on c.id = p.country_id
+    join sport_category sc on sc.id=sp.sport_category_id
+    left join team_roster tr on tr.player_ssn = sp.ssn
+    left join duel d on d.id=tr.duel_id
+    left join score s on s.player_ssn=sp.ssn
+group by sp.ssn, p.first_name, p.last_name, c.name, sc.name
+order by total_score desc;
+
+---------------------10
+CREATE OR REPLACE VIEW sponsorship_leaderboard as
+SELECT s.id,
+       s.name as sponsor_name,
+       count(Distinct ss.sport_team_id) as teams_sponsored,
+       sum(ss.amount) as total_invested,
+       max(ss.amount) as largest_deal,
+       min(ss.amount) as smallest_deal,
+       count(CASE
+                WHEN ss.start_date<=now()::date and (ss.end_date is NULL or ss.end_date>now()::date)
+            THEN 1 END) as active_deals
+FROM sponsor s
+    join sponsorship ss on s.id =ss.sponsor_id
+group by s.id, s.name;
+
+----------------------11
+CREATE OR REPLACE VIEW player_carrer_history as
+SELECT sp.ssn,
+       p.first_name || ' ' || p.last_name as player_name,
+       p.date_of_birth,
+       c_from.name as nationality,
+       scategory.name as sport_category,
+       sc.name as club_name,
+       club_country.name as club_country,
+       spc.start_date as contract_start,
+       spc.end_date as contract_end,
+       CASE
+           WHEN spc.end_date is null THEN 'ACTIVE'
+           WHEN spc.end_date>now()::date THEN 'ACTIVE'
+       ELSE 'EXPIRED' end as contract_status,
+       spc.payout as annual_payout,
+       count(*) over (
+           partition by sp.ssn
+           ) as total_contracts,
+       sum(spc.payout) over(
+           partition by sp.ssn
+           ) as career_total_payout
+FROM sportsperson sp
+    join person p on p.ssn=sp.ssn
+    join country c_from on c_from.id=p.country_id
+    join sportsperson_contract spc on spc.player_ssn=sp.ssn
+    join sport_category scategory on scategory.id=sp.sport_category_id
+    join sport_club sc on sc.id = spc.club_id
+    join country club_country on club_country.id = sc.country_id
+order by sp.ssn, spc.start_date;
+
