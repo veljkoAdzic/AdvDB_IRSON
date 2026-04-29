@@ -9,3 +9,7 @@ services:
       POSTGRES_USER: testadmin
     ports:
       - 5432:5432
+    command: >
+      bash -c "apt-get update &&
+               apt-get install -y curl &&
+               docker-entrypoint.sh postgres"

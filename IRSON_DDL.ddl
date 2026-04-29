@@ -237,7 +237,7 @@ CREATE TABLE COMPETITION (
     type                    int4         NOT NULL,
     organizer_federation_id int4         NOT NULL,
     season_id               int4,
-    name                    varchar(40)  NOT NULL,
+    name                    varchar(80)  NOT NULL,
     start_date              date         NOT NULL,
     end_date                date,
     PRIMARY KEY (id),
