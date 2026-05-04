@@ -1442,6 +1442,8 @@ JOIN (
 ) sp ON sp.sport_category_id = es.sport_category_id
     AND sp.sp_rn = es.global_slot;
 
+-- team roster zema od aktiven contract so toj klub igrach so taa sportska kategorija
+-- 0.05% prob za koga kapacitetot e > 3 nekoj igraah da dobie crven karton ili iskluchuvanje
 CREATE UNLOGGED TABLE tmp_contract_pool AS
 SELECT DISTINCT
     spc.player_ssn,
@@ -1499,8 +1501,6 @@ WHERE di.id BETWEEN (SELECT MIN(id) FROM tmp_duel_info)
                 AND (SELECT MIN(id) FROM tmp_duel_info) + 10
 LIMIT 50;
 
--- zema od aktiven contract so toj klub igrach so taa sportska kategorija
--- 0.05% prob za koga kapacitetot e > 3 nekoj igraah da dobie crven karton ili iskluchuvanje
 CREATE OR REPLACE FUNCTION insert_team_roster_batched_fixed()
 RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
@@ -1575,6 +1575,72 @@ BEGIN
 END;
 $$;
 select insert_team_roster_batched_fixed();
+
+-- refeering duel zema random federacija ako nema competition
+-- ako e nacionalna liga zema ref shto chlenuva vo taa federacija shto organizira ligata
+CREATE UNLOGGED TABLE tmp_duel_federation AS
+SELECT
+    d.id AS duel_id,
+    d.sport_category_id,
+    COALESCE(
+        c.organizer_federation_id,
+        (
+            SELECT f.id
+            FROM federation f
+            JOIN sport_category scat ON scat.sport_id = f.sport_id
+            WHERE scat.id = d.sport_category_id
+            ORDER BY random()
+            LIMIT 1
+        )
+    ) AS federation_id
+FROM duel d
+LEFT JOIN competition c ON c.id = d.competition_id;
+
+CREATE INDEX ON tmp_duel_federation(duel_id);
+CREATE INDEX ON tmp_duel_federation(sport_category_id, federation_id);
+
+CREATE UNLOGGED TABLE tmp_ref_assignment AS
+WITH ranked_duels AS (
+    SELECT
+        df.duel_id,
+        df.sport_category_id,
+        df.federation_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY df.sport_category_id, df.federation_id
+            ORDER BY d.start_time
+        ) AS duel_rn
+    FROM tmp_duel_federation df
+    JOIN duel d ON d.id = df.duel_id
+),
+ranked_refs AS (
+    SELECT
+        r.ssn,
+        r.sport_category_id,
+        r.federation_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY r.sport_category_id, r.federation_id
+            ORDER BY random()
+        ) AS ref_rn
+    FROM referee r
+)
+SELECT
+    rd.duel_id,
+    rr.ssn AS referee_ssn
+FROM ranked_duels rd
+JOIN ranked_refs rr
+    ON rr.sport_category_id = rd.sport_category_id
+    AND rr.federation_id = rd.federation_id
+    AND rr.ref_rn = ((rd.duel_rn - 1) % 100) + 1;
+
+CREATE INDEX ON tmp_ref_assignment(duel_id);
+
+INSERT INTO refereeing_duel (referee_ssn, duel_id)
+SELECT referee_ssn, duel_id
+FROM tmp_ref_assignment
+ON CONFLICT DO NOTHING;
+
+DROP TABLE tmp_duel_federation;
+DROP TABLE tmp_ref_assignment;
 
 -- score pushta generate series od duel za scorot i soodvetno stava na igrachi shto se na terenot
 CREATE UNLOGGED TABLE tmp_score_data AS
@@ -1657,72 +1723,6 @@ ON CONFLICT DO NOTHING;
 DROP TABLE tmp_score_data;
 DROP TABLE tmp_roster_data;
 
--- refeering duel zema random federacija ako nema competition
--- ako e nacionalna liga zema ref shto chlenuva vo taa federacija shto organizira ligata
-CREATE UNLOGGED TABLE tmp_duel_federation AS
-SELECT
-    d.id AS duel_id,
-    d.sport_category_id,
-    COALESCE(
-        c.organizer_federation_id,
-        (
-            SELECT f.id
-            FROM federation f
-            JOIN sport_category scat ON scat.sport_id = f.sport_id
-            WHERE scat.id = d.sport_category_id
-            ORDER BY random()
-            LIMIT 1
-        )
-    ) AS federation_id
-FROM duel d
-LEFT JOIN competition c ON c.id = d.competition_id;
-
-CREATE INDEX ON tmp_duel_federation(duel_id);
-CREATE INDEX ON tmp_duel_federation(sport_category_id, federation_id);
-
-CREATE UNLOGGED TABLE tmp_ref_assignment AS
-WITH ranked_duels AS (
-    SELECT
-        df.duel_id,
-        df.sport_category_id,
-        df.federation_id,
-        ROW_NUMBER() OVER (
-            PARTITION BY df.sport_category_id, df.federation_id
-            ORDER BY d.start_time
-        ) AS duel_rn
-    FROM tmp_duel_federation df
-    JOIN duel d ON d.id = df.duel_id
-),
-ranked_refs AS (
-    SELECT
-        r.ssn,
-        r.sport_category_id,
-        r.federation_id,
-        ROW_NUMBER() OVER (
-            PARTITION BY r.sport_category_id, r.federation_id
-            ORDER BY random()
-        ) AS ref_rn
-    FROM referee r
-)
-SELECT
-    rd.duel_id,
-    rr.ssn AS referee_ssn
-FROM ranked_duels rd
-JOIN ranked_refs rr
-    ON rr.sport_category_id = rd.sport_category_id
-    AND rr.federation_id = rd.federation_id
-    AND rr.ref_rn = ((rd.duel_rn - 1) % 100) + 1;
-
-CREATE INDEX ON tmp_ref_assignment(duel_id);
-
-INSERT INTO refereeing_duel (referee_ssn, duel_id)
-SELECT referee_ssn, duel_id
-FROM tmp_ref_assignment
-ON CONFLICT DO NOTHING;
-
-DROP TABLE tmp_duel_federation;
-DROP TABLE tmp_ref_assignment;
-
 -- global counts
 SELECT 'club_federation' AS tablename, COUNT(*) FROM club_federation UNION ALL
 SELECT 'coach', COUNT(*) FROM coach UNION ALL
@@ -1754,10 +1754,3 @@ SELECT 'sportsperson', COUNT(*) FROM sportsperson UNION ALL
 SELECT 'sportsperson_contract', COUNT(*) FROM sportsperson_contract UNION ALL
 SELECT 'team_roster', COUNT(*) FROM team_roster
 ORDER BY tablename;
-
--- dozvolen overlap za reprezentaciski club contract i nerepreznetaciski
-SELECT sc.player_ssn, count(*)
-FROM sportsperson_contract sc
-WHERE sc.end_date IS NULL
-GROUP BY sc.player_ssn
-HAVING count(*) > 1;

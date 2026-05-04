@@ -227,8 +227,8 @@ SELECT
     l.name AS location,
     ht.name AS home_team,
     at.name AS away_team,
-    COALESCE(d.home_team_score, 0) AS home_team_goals,
-    COALESCE(d.away_team_score, 0) AS away_team_goals,
+    COALESCE(d.home_team_score, 0) AS home_team_scores,
+    COALESCE(d.away_team_score, 0) AS away_team_scores,
     CASE
         WHEN d.home_team_score > d.away_team_score THEN ht.name
         WHEN d.away_team_score > d.home_team_score THEN at.name
@@ -345,6 +345,7 @@ order by sp.ssn, spc.start_date;
 -----------------------------------------------------------------------------
 -- TO DO: duel score i season standing so indeksiranje zemanje od score tabela
 -- so joini kako shto kazha Nenand
+-- goals da se zemani so score (poopshto)
 CREATE OR REPLACE VIEW duel_score AS
 SELECT
     d.id AS duel_id,
