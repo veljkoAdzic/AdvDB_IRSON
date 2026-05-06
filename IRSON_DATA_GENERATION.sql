@@ -1,8 +1,8 @@
 -- team roster kje ima dueli * 2 * 2.2 (avg team capacity)
 -- scores kje ima dueli * (~17) pati
--- refereing duel kje ima kolku duel
+-- refereing duel kje ima kolku duel * 2
 -- coaching team kje ima teams * 2
--- contracti kje ima teams * (~44) pati
+-- contracti kje ima teams * (~44) pati * 1.8
 -- 8,732,478 persons se dovolni sega generira 16m ama so ssn distinct sega se 13m
 -- 15m dueli vo 5 sezoni - 3m po sezona lesno promenlivo za povekje
 --      samo generate series vo sezona kje se zgolemi
@@ -957,8 +957,7 @@ CROSS JOIN LATERAL (
     WHERE st1.id IS NOT NULL AND st2.id IS NOT NULL -- da raboti random
 ) AS generated_times
 JOIN sport_category scat ON scat.id = st1.sport_category_id
-LEFT JOIN score_logic sl ON sl.sport_id = scat.sport_id
-offset 100;
+LEFT JOIN score_logic sl ON sl.sport_id = scat.sport_id;
 
 -- duel no rep
 CREATE UNLOGGED TABLE tmp_season_teams_rr AS
@@ -1639,8 +1638,54 @@ SELECT referee_ssn, duel_id
 FROM tmp_ref_assignment
 ON CONFLICT DO NOTHING;
 
-DROP TABLE tmp_duel_federation;
 DROP TABLE tmp_ref_assignment;
+
+-- vtor ref po duel
+CREATE UNLOGGED TABLE tmp_ref_assignment2 AS
+WITH ranked_duels AS (
+    SELECT
+        df.duel_id,
+        df.sport_category_id,
+        df.federation_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY df.sport_category_id, df.federation_id
+            ORDER BY d.start_time
+        ) AS duel_rn
+    FROM tmp_duel_federation df
+    JOIN duel d ON d.id = df.duel_id
+),
+ranked_refs AS (
+    SELECT
+        r.ssn,
+        r.sport_category_id,
+        r.federation_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY r.sport_category_id, r.federation_id
+            ORDER BY random()
+        ) AS ref_rn,
+        COUNT(*) OVER (
+            PARTITION BY r.sport_category_id, r.federation_id
+        ) AS ref_count
+    FROM referee r
+)
+SELECT
+    rd.duel_id,
+    rr.ssn AS referee_ssn
+FROM ranked_duels rd
+JOIN ranked_refs rr
+    ON rr.sport_category_id = rd.sport_category_id
+    AND rr.federation_id = rd.federation_id
+    AND rr.ref_rn = ((rd.duel_rn - 1 + 50) % GREATEST(rr.ref_count, 1)) + 1;
+
+CREATE INDEX ON tmp_ref_assignment2(duel_id);
+
+INSERT INTO refereeing_duel (referee_ssn, duel_id)
+SELECT referee_ssn, duel_id
+FROM tmp_ref_assignment2
+ON CONFLICT DO NOTHING;
+
+DROP TABLE tmp_ref_assignment2;
+DROP TABLE tmp_duel_federation;
 
 -- score pushta generate series od duel za scorot i soodvetno stava na igrachi shto se na terenot
 CREATE UNLOGGED TABLE tmp_score_data AS
@@ -1694,6 +1739,7 @@ JOIN LATERAL (
     ORDER BY random()
     LIMIT 1
 ) roster ON true
+LIMIT 15000000
 ON CONFLICT DO NOTHING;
 
 INSERT INTO score (duel_id, player_ssn, time_score)
@@ -1718,6 +1764,7 @@ JOIN LATERAL (
     ORDER BY random()
     LIMIT 1
 ) roster ON true
+LIMIT 15000000
 ON CONFLICT DO NOTHING;
 
 DROP TABLE tmp_score_data;
