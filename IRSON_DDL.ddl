@@ -255,19 +255,15 @@ CREATE TABLE DUEL (
     competition_id    int4,
     start_time        timestamp NOT NULL,
     sport_category_id int4 NOT NULL,
-    home_game_result int4, --rezultati
-    away_game_result int4,
+    home_team_score int4,
+    away_team_score int4,
     PRIMARY KEY (id),
     CONSTRAINT competition_fk FOREIGN KEY (competition_id) REFERENCES COMPETITION (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT home_team_fk FOREIGN KEY (home_team_id) REFERENCES SPORT_TEAM (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT away_team_fk FOREIGN KEY (away_team_id) REFERENCES SPORT_TEAM (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT location_fk FOREIGN KEY (location_id) REFERENCES LOCATION (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT category_fk FOREIGN KEY (sport_category_id) REFERENCES SPORT_CATEGORY (id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT different_teams_c CHECK ( home_team_id != away_team_id ),
-    CONSTRAINT home_score_check CHECK (home_game_result >= 0), --constraint za result
-    CONSTRAINT away_score_check CHECK (away_game_result >= 0),
-    CONSTRAINT both_scores_null_or_not CHECK ((home_game_result IS NULL AND away_game_result IS NULL)
-    OR (home_game_result IS NOT NULL AND away_game_result IS NOT NULL))
+    CONSTRAINT different_teams_c CHECK ( home_team_id != away_team_id )
 );
 
 CREATE TABLE SCORE (
