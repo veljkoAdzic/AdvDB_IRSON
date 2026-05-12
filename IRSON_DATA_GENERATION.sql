@@ -1212,12 +1212,18 @@ JOIN available_people ap ON 1=1
 CROSS JOIN total_persons tp
 WHERE ap.person_rn = ((fed.combo_rn - 1) * 100 + gs.slot - 1) % tp.cnt + 1
 ON CONFLICT (ssn) DO NOTHING;
-
+CREATE INDEX IF NOT EXISTS idx_referee_ssn ON referee(ssn);
 CREATE TABLE tmp_people_no_referee AS
-SELECT ssn,
-       ROW_NUMBER() OVER (ORDER BY random()) AS person_rn
-FROM   PERSON
-WHERE  ssn NOT IN (SELECT ssn FROM REFEREE);
+SELECT *
+from tmp_people tp
+Where NOT EXISTS(
+    SELECT 1 from referee r
+    Where tp.ssn = r.ssn
+);
+
+Drop INDEX idx_referee_ssn;
+
+-- WHERE  ssn NOT IN (SELECT ssn FROM REFEREE);
 CREATE INDEX ON tmp_people_no_referee(person_rn);
 WITH total AS (
     SELECT COUNT(*) AS cnt FROM tmp_people_no_referee
@@ -1265,9 +1271,12 @@ ON CONFLICT (ssn) DO NOTHING;
 CREATE TABLE tmp_sportspersons_pool AS
 SELECT ssn,
        ROW_NUMBER() OVER (ORDER BY random()) AS rn
-FROM PERSON
-WHERE ssn NOT IN (SELECT ssn FROM REFEREE)
-  AND ssn NOT IN (SELECT ssn FROM COACH);
+FROM tmp_people_no_referee p
+WHERE NOT EXISTS(
+    SELECT 1
+    FROM COACH c
+    WHERE c.ssn = p.ssn
+);
 CREATE INDEX ON tmp_sportspersons_pool(rn);
 WITH total AS (
     SELECT COUNT(*) AS cnt FROM tmp_sportspersons_pool
@@ -1500,19 +1509,40 @@ WHERE di.id BETWEEN (SELECT MIN(id) FROM tmp_duel_info)
                 AND (SELECT MIN(id) FROM tmp_duel_info) + 10
 LIMIT 50;
 
-CREATE OR REPLACE FUNCTION insert_team_roster_batched_fixed()
-RETURNS void LANGUAGE plpgsql AS $$
+-- temp tabela za chuvanje progress
+CREATE TABLE IF NOT EXISTS team_roster_progress (
+    id              SERIAL PRIMARY KEY,
+    last_committed  INT NOT NULL,
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+
+CREATE OR REPLACE PROCEDURE insert_team_roster_batched_fixed()
+LANGUAGE plpgsql AS $$
 DECLARE
     batch_size  INT := 10000;
     current_id  INT;
     max_id      INT;
     batch_end   INT;
+    checkpoint  INT;
 BEGIN
+    -- Najdi posleden checkpoint
+    SELECT last_committed INTO checkpoint
+    FROM team_roster_progress
+    ORDER BY id DESC
+    LIMIT 1;
+
     SELECT MIN(id), MAX(id) INTO current_id, max_id FROM tmp_duel_info;
+
+    IF checkpoint IS NOT NULL AND checkpoint >= current_id THEN
+        current_id := checkpoint + 1; -- peodolzi od posleden COMMIT
+        RAISE NOTICE 'Resuming from duel id %  (last checkpoint: %)', current_id, checkpoint;
+    END IF;
 
     WHILE current_id <= max_id LOOP
         batch_end := current_id + batch_size - 1;
 
+        -- Home team roster
         INSERT INTO team_roster (player_ssn, team_id, duel_id, start_time, end_time)
         SELECT
             cp.player_ssn,
@@ -1539,6 +1569,7 @@ BEGIN
         WHERE di.id BETWEEN current_id AND batch_end
         ON CONFLICT DO NOTHING;
 
+        -- Away team roster
         INSERT INTO team_roster (player_ssn, team_id, duel_id, start_time, end_time)
         SELECT
             cp.player_ssn,
@@ -1565,15 +1596,24 @@ BEGIN
         WHERE di.id BETWEEN current_id AND batch_end
         ON CONFLICT DO NOTHING;
 
-        RAISE NOTICE 'Done duels % – %, roster count: %',
+        -- azuriranje checkpoint
+        INSERT INTO team_roster_progress (last_committed)
+        VALUES (batch_end);
+
+        RAISE NOTICE '[%] Done duels % – %, roster count: %',
+            now()::time + interval '2 hours',
             current_id, batch_end,
             (SELECT COUNT(*) FROM team_roster);
 
+        COMMIT;
+
         current_id := current_id + batch_size;
     END LOOP;
+
+    RAISE NOTICE 'All batches complete.';
 END;
 $$;
-select insert_team_roster_batched_fixed();
+CALL insert_team_roster_batched_fixed();
 
 -- refeering duel zema random federacija ako nema competition
 -- ako e nacionalna liga zema ref shto chlenuva vo taa federacija shto organizira ligata
@@ -1769,6 +1809,18 @@ ON CONFLICT DO NOTHING;
 
 DROP TABLE tmp_score_data;
 DROP TABLE tmp_roster_data;
+
+
+DROP TABLE team_roster_progress;
+DROP TABLE temp_clubs_names;
+DROP TABLE temp_female_names;
+DROP TABLE temp_male_names;
+DROP TABLE temp_surnames;
+DROP TABLE tmp_contract_pool;
+DROP TABLE tmp_duel_federation;
+DROP TABLE tmp_duel_info;
+DROP TABLE tmp_people_no_referee;
+DROP TABLE tmp_sportspersons_pool;
 
 -- global counts
 SELECT 'club_federation' AS tablename, COUNT(*) FROM club_federation UNION ALL
