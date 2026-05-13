@@ -385,6 +385,9 @@ ORDER BY duel_start DESC, minutes_missed DESC, d.competition_id;
 select * from get_red_cards WHERE competition_id = 877;
 -----------------------------------------------------------------------------
 -- 10. player career history
+CREATE INDEX idx_sportsperson_contract_player_ssn_start_date
+    ON sportsperson_contract (player_ssn, start_date);
+    
 CREATE VIEW player_career_history AS
 SELECT sp.ssn,
        p.first_name || ' ' || p.last_name as player_name,
@@ -411,68 +414,4 @@ FROM sportsperson sp
     join sport_club sc on sc.id = spc.club_id
     join country club_country on club_country.id = sc.country_id
 order by sp.ssn, spc.start_date;
-select * from player_career_history where ssn = '271196542072';
------------------------------------------------------------------------------
--- TODO: duel score i season standing so indeksiranje zemanje od score tabela
--- so joini kako shto kazha Nenand
--- goals da se zemani so score (poopshto)
-CREATE OR REPLACE VIEW duel_score AS
-SELECT
-    d.id AS duel_id,
-    d.home_team_id,
-    d.away_team_id,
-    (
-        SELECT COUNT(*)
-        FROM SCORE s
-        JOIN TEAM_ROSTER tr
-            ON s.duel_id = tr.duel_id
-           AND s.player_ssn = tr.player_ssn
-           AND tr.team_id = d.home_team_id
-        WHERE s.duel_id = d.id
-    ) AS home_team_goals,
-    (
-        SELECT COUNT(*)
-        FROM SCORE s
-        JOIN TEAM_ROSTER tr
-            ON s.duel_id = tr.duel_id
-           AND s.player_ssn = tr.player_ssn
-           AND tr.team_id = d.away_team_id
-        WHERE s.duel_id = d.id
-    ) AS away_team_goals
-FROM DUEL d;
-CREATE OR REPLACE VIEW season_team_standings AS
-SELECT
-    t.id   AS team_id,
-    t.name AS team_name,
-    c.season_id,
-    COUNT(*) AS matches_played,
-    SUM(
-        CASE
-            WHEN (t.id = ds.home_team_id AND ds.home_team_goals > ds.away_team_goals)
-              OR (t.id = ds.away_team_id AND ds.away_team_goals > ds.home_team_goals)
-                THEN sc.points_per_win
-            WHEN ds.home_team_goals = ds.away_team_goals
-                THEN sc.points_per_draw
-            ELSE sc.points_per_losing
-        END
-    ) AS total_points,
-    SUM(
-        CASE WHEN t.id = ds.home_team_id THEN ds.home_team_goals
-             ELSE ds.away_team_goals END
-    ) AS goals_scored,
-    SUM(
-        CASE WHEN t.id = ds.home_team_id THEN ds.away_team_goals
-             ELSE ds.home_team_goals END
-    ) AS goals_conceded
-FROM SPORT_TEAM t
-JOIN duel_score ds
-    ON t.id IN (ds.home_team_id, ds.away_team_id)
-JOIN DUEL d
-    ON d.id = ds.duel_id
-JOIN COMPETITION c
-    ON d.competition_id = c.id
-   AND c.season_id = 1
-JOIN SPORT_CATEGORY sc
-    ON sc.id = d.sport_category_id
-GROUP BY t.id, t.name, c.season_id
-ORDER BY total_points DESC, (goals_scored - goals_conceded) DESC;
+select * from player_career_history where ssn = '220598645596';
