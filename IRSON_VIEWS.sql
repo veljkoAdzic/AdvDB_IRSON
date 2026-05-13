@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS duel_season_standing_indexes ON
+    duel(home_team_id, away_team_id, start_time, competition_id, sport_category_id);
+
 -- 1. season standing
 CREATE VIEW season_standing AS
 SELECT
@@ -73,8 +76,15 @@ ORDER BY
             END
         )
     ) DESC;
-select * from season_standing where season_id = 7839809;
+select * from season_standing where season_id = 783;
 -----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS sport_team_income_indexes
+    on sport_team(club_id);
+CREATE INDEX IF NOT EXISTS sponsorship_income_indexes
+    on sponsorship(sport_team_id, start_date, end_date);
+CREATE INDEX IF NOT EXISTS contract_income_indexes
+    on sportsperson_contract(club_id, start_date, end_date);
+
 -- 2. monthly income for club
 CREATE VIEW monthly_income_for_club AS
 SELECT
@@ -86,16 +96,29 @@ SELECT
     count(distinct ss.sponsor_id) AS number_of_active_sponsorships,
     count(distinct scn.player_ssn) AS number_of_player_active_contracts
 FROM sport_club sc
-JOIN sportsperson_contract scn on scn.club_id = sc.id
+JOIN sportsperson_contract scn
+    on scn.club_id = sc.id
     and scn.start_date <= now()::date
     and (scn.end_date is null or scn.end_date > now()::date + INTERVAL '30 days')
-JOIN sport_team st on st.club_id = sc.id
-JOIN sponsorship ss on ss.sport_team_id = st.id
+JOIN sport_team st
+    on st.club_id = sc.id
+JOIN sponsorship ss
+    on ss.sport_team_id = st.id
     and ss.start_date < now()::date
     and (ss.end_date is null or ss.end_date > now()::date + INTERVAL '30 days')
 GROUP BY sc.id, sc.name;
-select * from monthly_income_for_club where id = 97426;
+select * from monthly_income_for_club where id = 96426;
 -----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS duel_upcoming_indexes ON
+    duel(
+         start_time,
+         home_team_id,
+        away_team_id,
+        sport_category_id,
+        location_id,
+        competition_id
+    );
+
 -- 3. upcoming duels
 CREATE VIEW upcoming_duels AS
 SELECT
@@ -115,28 +138,60 @@ JOIN sport_team away ON away.id = d.away_team_id
 JOIN sport_category scat ON scat.id = d.sport_category_id
 JOIN location l ON l.id = d.location_id
 JOIN country c ON c.id = l.country_id
-LEFT JOIN competition com on c.id = d.competition_id
+LEFT JOIN competition com
+    on com.id = d.competition_id
 WHERE d.start_time > NOW()
 ORDER BY com.name;
 select * from upcoming_duels
 where match_date <= (now() + INTERVAL '7 days')::date
     and country like '%Macedonia'
 order by match_date, kickoff, capacity DESC;
--- TODO: so ime na competiton da se fixa
 -----------------------------------------------------------------------------
 -- 4. free locations
+create index duel_free_locations_indexes on
+    duel(start_time) INCLUDE (location_id, sport_category_id);
+CREATE INDEX idx_location_capacity ON
+    location(capacity, country_id) INCLUDE (name, address);
+
+CREATE VIEW free_locations AS
 SELECT
+    l.id as venue_id,
     l.name AS venue,
     l.capacity,
     l.address,
-    c.name AS country,
-    c.id AS country_id
+    c.id AS country_id,
+    c.name AS country
 FROM location l
-JOIN country c ON c.id = l.country_id
-JOIN DUEL d ON d.location_id = l.id;
---TODO: da se zavhrsi
+JOIN country c
+    ON c.id = l.country_id
+;
+SELECT *
+from free_locations
+WHERE
+    capacity >= 10000
+    and country LIKE '%Macedonia'
+    and not exists(
+        select 1
+        from duel d
+        join sport_category cat
+            on cat.id = d.sport_category_id
+        WHERE d.location_id = venue_id
+          AND d.start_time < '2026-05-10 21:00:00'::timestamp -- end od range
+          AND d.start_time +
+              (interval '1 minute' * cat.duration_minutes) >
+              '2026-05-10 16:00:00'::timestamp -- start of range
+    )
+ORDER BY capacity
+;
 -----------------------------------------------------------------------------
 -- 5. top scorers on competition
+create index score_top_scorers_indexes ON
+    score(duel_id) INCLUDE (player_ssn);
+create index duel_top_scorers_indexes ON
+    duel(competition_id)
+    WHERE competition_id IS NOT NULL;
+
+
 CREATE VIEW top_scorers_on_competition AS
 SELECT
     comp.id AS competition_id,
@@ -154,7 +209,7 @@ JOIN SPORT_TEAM t ON t.id = tr.team_id
 WHERE d.competition_id IS NOT NULL
 GROUP BY comp.id, comp.name, s.player_ssn, p.first_name, p.last_name, t.name
 ORDER BY scores DESC;
-select * from top_scorers_on_competition where competition_id = 7287756;
+select * from top_scorers_on_competition where competition_id = 87756;
 -----------------------------------------------------------------------------
 -- 6. referee work
 CREATE VIEW referee_work AS
@@ -174,9 +229,12 @@ LEFT JOIN REFEREEING_DUEL rd ON rd.referee_ssn = r.ssn
 LEFT JOIN DUEL d ON d.id = rd.duel_id
 JOIN FEDERATION f ON f.id = r.federation_id
 GROUP BY r.ssn, p.first_name, p.last_name, c.name, sc.name;
-select * from referee_work where referee_ssn = '151200845059';
+select * from referee_work where referee_ssn = '190495847040';
 -----------------------------------------------------------------------------
 -- 7. team stats: team coaches, active contracts and upcoming duels
+CREATE INDEX coaching_team_team_stats_indexes ON
+    coaching_team(team_id) WHERE end_date IS NULL;
+
 CREATE VIEW team_stats AS
 SELECT
     t.id AS team_id,
@@ -220,6 +278,11 @@ JOIN COUNTRY c ON c.id = sc.country_id
 JOIN SPORT_CATEGORY scat ON scat.id = t.sport_category_id;
 select * from team_stats ts where ts.team_id = 205986;
 -----------------------------------------------------------------------------
+CREATE INDEX roster_duel_history_indexes ON
+    team_roster(duel_id, team_id) INCLUDE (player_ssn, end_time);
+CREATE INDEX idx_refereeing_duel_duel_id ON
+    refereeing_duel(duel_id) INCLUDE (referee_ssn);
+
 -- 8. duel history which teams, team rosters, scores, and red cads
 CREATE VIEW duel_history AS
 SELECT
@@ -293,7 +356,7 @@ JOIN SPORT_TEAM at ON at.id = d.away_team_id
 JOIN LOCATION l ON l.id = d.location_id
 WHERE d.start_time < NOW()
 ORDER BY d.start_time DESC;
-select * from duel_history where duel_id = 32434137;
+select * from duel_history where duel_id = 23;
 -----------------------------------------------------------------------------
 -- 9. players that got red card
 CREATE VIEW get_red_cards AS
@@ -319,8 +382,7 @@ JOIN SPORT_TEAM at ON at.id = d.away_team_id
 WHERE scat.team_capacity > 3
   AND tr.end_time < (scat.duration_minutes * INTERVAL '1 minute')::time
 ORDER BY duel_start DESC, minutes_missed DESC, d.competition_id;
-select * from get_red_cards where get_red_cards.sport_category_id = 1
-    and competition_id < 7284256 + 100;
+select * from get_red_cards WHERE competition_id = 877;
 -----------------------------------------------------------------------------
 -- 10. player career history
 CREATE VIEW player_career_history AS
