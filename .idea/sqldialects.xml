@@ -3,6 +3,7 @@
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/IRSON_DATA_GENERATION.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/IRSON_DDL.ddl" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/IRSON_PRCEDURES.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/IRSON_VIEWS.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/csvQueries/boyNames.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/csvQueries/clubs.sql" dialect="PostgreSQL" />
