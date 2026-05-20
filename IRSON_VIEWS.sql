@@ -76,7 +76,7 @@ ORDER BY
             END
         )
     ) DESC;
-select * from season_standing where season_id = 783;
+select * from season_standing where season_id = 7562281;
 -----------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS sport_team_income_indexes
     on sport_team(club_id);
@@ -191,7 +191,6 @@ create index duel_top_scorers_indexes ON
     duel(competition_id)
     WHERE competition_id IS NOT NULL;
 
-
 CREATE VIEW top_scorers_on_competition AS
 SELECT
     comp.id AS competition_id,
@@ -209,7 +208,7 @@ JOIN SPORT_TEAM t ON t.id = tr.team_id
 WHERE d.competition_id IS NOT NULL
 GROUP BY comp.id, comp.name, s.player_ssn, p.first_name, p.last_name, t.name
 ORDER BY scores DESC;
-select * from top_scorers_on_competition where competition_id = 87756;
+select * from top_scorers_on_competition where competition_id = 7284276;
 -----------------------------------------------------------------------------
 -- 6. referee work
 CREATE VIEW referee_work AS
@@ -229,7 +228,7 @@ LEFT JOIN REFEREEING_DUEL rd ON rd.referee_ssn = r.ssn
 LEFT JOIN DUEL d ON d.id = rd.duel_id
 JOIN FEDERATION f ON f.id = r.federation_id
 GROUP BY r.ssn, p.first_name, p.last_name, c.name, sc.name;
-select * from referee_work where referee_ssn = '190495847040';
+select * from referee_work where referee_ssn = '190794446522';
 -----------------------------------------------------------------------------
 -- 7. team stats: team coaches, active contracts and upcoming duels
 CREATE INDEX coaching_team_team_stats_indexes ON
@@ -356,7 +355,7 @@ JOIN SPORT_TEAM at ON at.id = d.away_team_id
 JOIN LOCATION l ON l.id = d.location_id
 WHERE d.start_time < NOW()
 ORDER BY d.start_time DESC;
-select * from duel_history where duel_id = 23;
+select * from duel_history where duel_id = 35381313;
 -----------------------------------------------------------------------------
 -- 9. players that got red card
 CREATE VIEW get_red_cards AS
@@ -382,12 +381,12 @@ JOIN SPORT_TEAM at ON at.id = d.away_team_id
 WHERE scat.team_capacity > 3
   AND tr.end_time < (scat.duration_minutes * INTERVAL '1 minute')::time
 ORDER BY duel_start DESC, minutes_missed DESC, d.competition_id;
-select * from get_red_cards WHERE competition_id = 877;
+select * from get_red_cards;
 -----------------------------------------------------------------------------
 -- 10. player career history
 CREATE INDEX idx_sportsperson_contract_player_ssn_start_date
     ON sportsperson_contract (player_ssn, start_date);
-    
+
 CREATE VIEW player_career_history AS
 SELECT sp.ssn,
        p.first_name || ' ' || p.last_name as player_name,
