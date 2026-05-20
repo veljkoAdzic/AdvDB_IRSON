@@ -2,5 +2,6 @@
 !.gitignore
 !*.vpp
 !*.png
+!*.sql
 
 .idea/
