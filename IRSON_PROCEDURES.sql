@@ -1,5 +1,4 @@
--- 7 registracija na sportsperson, referee i coach
-
+-- registracija na sportsperson, referee i coach
 CREATE OR REPLACE PROCEDURE register_sportsperson(
     n_ssn           char(13),
     n_first_name    varchar(30),
@@ -181,14 +180,11 @@ BEGIN
 
     INSERT INTO referee(ssn, sport_category_id, federation_id) VALUES
         (n_ssn, n_sport_category_id, n_federation_id);
-
     COMMIT;
-
 END;
 $$;
-
-
--- 1. obnovi contract so nova suma za ist tim
+CALL register_referee('030299412014', 'Ivicaaa', 'Perovski', '1994-02-03'::date, 'M', 112, 1, 112);
+-----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE renew_sportsperson_contract(
     old_contract_id int4,
     n_end_date date,
@@ -239,13 +235,11 @@ BEGIN
     -- dodavanje nov dogovor
     INSERT INTO sportsperson_contract(player_ssn, club_id, start_date, end_date, payout)
     VALUES (o_ssn, o_club_id, o_end_date, n_end_date, n_payout);
-
     COMMIT;
-
 END;
 $$;
-
--- 2. pozajmica contract na input se dobiva interval zavrshuva contract so segashniot club
+call renew_sportsperson_contract(6050471, NULL, 2000000);
+-----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE borrow_player(
     p_ssn char(13),
     borrowed_club_id int4,
@@ -260,7 +254,6 @@ DECLARE
     old_end_date date;
     old_payout int4;
 BEGIN
-
     -- validacija vlezovi
     IF from_date IS NULL OR to_date IS NULL OR from_date > to_date THEN
         RAISE EXCEPTION 'Invalid borrow date range!';
@@ -320,7 +313,8 @@ BEGIN
     COMMIT;
 END;
 $$;
-
+call borrow_player('191199745536', '87925', '87926', now()::date, '2026-06-06'::date, 17000);
+-----------------------------------------------------------------------------
 -- 6. promote sportperson to coach (samo ako nema aktiven contract sega)
 CREATE OR REPLACE PROCEDURE promote_sportsperson_to_coach(
     p_ssn char(13),
@@ -332,7 +326,7 @@ BEGIN
         RAISE EXCEPTION 'Invalid p_ssn - Player with ssn % does not exist!', p_ssn;
     end if;
 
-    IF NOT EXISTS(SELECT 1 FROM coach WHERE ssn = p_ssn) THEN
+    IF EXISTS(SELECT 1 FROM coach WHERE ssn = p_ssn) THEN
         RAISE EXCEPTION 'Invalid p_ssn - Player is already promoted';
     end if;
 
@@ -352,13 +346,12 @@ BEGIN
         FROM sportsperson
         WHERE ssn = p_ssn
     ;
-
     COMMIT;
-
 END;
 $$;
-
----
+CALL promote_sportsperson_to_coach('150100143541', 1816); -- okay
+CALL promote_sportsperson_to_coach('150100143541', 1816); -- already promoted
+-----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE start_new_season(
     league_id              int4,
     years_from_last_season int4 -- because all seasons for this year are already generated
@@ -537,13 +530,11 @@ BEGIN
     FROM resolved r
     LEFT JOIN score_logic sl ON sl.sport_id = (
                SELECT sc.sport_id FROM sport_category sc WHERE sc.id = scat_id);
-
 END;
 $$;
-CALL start_new_season(3, 20); -- okay
-CALL start_new_season(-22515235, 20); -- invalid id
-CALL start_new_season(2279810, 50); -- invalid year
-
+CALL start_new_season(2279810, 14); -- okay
+CALL start_new_season(-22515235, 14); -- invalid id
+CALL start_new_season(2279810, 25); -- invalid years
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE reschedule_duel(
     d_id int4,
@@ -614,13 +605,10 @@ BEGIN
     RAISE NOTICE 'Duel % rescheduled to %', d_id, new_ts;
 END;
 $$;
-
-SELECT * from duel WHERE id = 4;
-
-CALL reschedule_duel(3, '2027-05-20 18:00:00.000000'::timestamp); -- past duel
-CALL reschedule_duel(4, '2022-05-20 18:00:00.000000'::timestamp); -- rescheduling future for past
-CALL reschedule_duel(4, '2028-05-20 18:00:00.000000'::timestamp); -- okay
-CALL reschedule_duel(4, '2026-08-11 12:00:00.000000'::timestamp); -- time overlap of same team on another duel
+CALL reschedule_duel(47870948, '2027-05-20 18:00:00.000000'::timestamp); -- past duel
+CALL reschedule_duel(32668983, '2022-05-20 18:00:00.000000'::timestamp); -- rescheduling future for past
+CALL reschedule_duel(32668983, '2028-05-20 18:00:00.000000'::timestamp); -- okay
+CALL reschedule_duel(32668983, '2026-08-11 12:00:00.000000'::timestamp); -- time overlap of same team on another duel
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE assign_referee_for_duel(
     d_id int4
@@ -687,10 +675,8 @@ BEGIN
     INSERT INTO refereeing_duel VALUES (ref_ssn, d_id);
 END;
 $$;
-CALL assign_referee_for_duel(4); -- okay
-
----
-
+CALL assign_referee_for_duel(47870948); -- okay
+-----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE add_sponsorship_to_team(
     Nteam_id int,
     Nsponsor_id int,
@@ -744,9 +730,8 @@ BEGIN
 
 end;
 $$;
-
-CALL add_sponsorship_to_team(1, 2, '2024-09-13'::date, '2026-12-10'::date, 12345);
-
+CALL add_sponsorship_to_team(1, 3, '2024-09-13'::date, '2026-12-10'::date, 12345);
+-----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE rename_sport_club(
     p_club_id int,
     p_name varchar(150)
@@ -798,4 +783,4 @@ BEGIN
 
 end;
 $$;
-call rename_sport_club(58767, 'NovoImee Jas');
+call rename_sport_club(97434, 'AAAAAAAAAAAAA');
