@@ -1,6 +1,3 @@
--- TRIGGERS
-
---1
 CREATE OR REPLACE FUNCTION check_contract_club()
 RETURNS trigger AS $$
 DECLARE
@@ -28,8 +25,8 @@ BEGIN
         JOIN sport_club sc ON sc.id = c.club_id
         WHERE c.player_ssn = NEW.player_ssn
           AND (NEW.id IS NULL OR c.id <> NEW.id)
-          AND NEW.start_date <= COALESCE(c.end_date, 'infinity'::date)
-          AND COALESCE(NEW.end_date, 'infinity'::date) >= c.start_date
+          AND NEW.start_date < COALESCE(c.end_date, 'infinity'::date)
+          AND COALESCE(NEW.end_date, 'infinity'::date) > c.start_date
           AND sc.is_national_representation = is_nat
     ) THEN
         IF is_nat THEN
@@ -47,9 +44,7 @@ CREATE TRIGGER trg_check_contract
 BEFORE INSERT OR UPDATE ON sportsperson_contract
 FOR EACH ROW
 EXECUTE FUNCTION check_contract_club();
-
-
---2
+-----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION check_team_roster_contract()
 RETURNS trigger AS $$
 DECLARE
@@ -110,10 +105,7 @@ CREATE TRIGGER trg_check_team_roster
 BEFORE INSERT OR UPDATE ON team_roster
 FOR EACH ROW
 EXECUTE FUNCTION check_team_roster_contract();
-
-
---3
---Change to compare sport_category_id from sport team no to go through federation
+-----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION check_duel_validity()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -216,9 +208,7 @@ CREATE TRIGGER trg_check_team_sport_and_rep
 BEFORE INSERT OR UPDATE ON DUEL
 FOR EACH ROW
 EXECUTE FUNCTION check_duel_validity();
-
-
---4
+-----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION check_referee_availability()
 RETURNS TRIGGER AS $$
 DECLARE
