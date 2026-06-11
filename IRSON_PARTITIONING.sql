@@ -328,3 +328,172 @@ Planning:
 Planning Time: 2.383 ms
 Execution Time: 388.151 ms
  */
+
+CREATE INDEX IF NOT EXISTS duel_upcoming_indexes ON
+    duel(
+         start_time,
+         home_team_id,
+        away_team_id,
+        sport_category_id,
+        location_id,
+        competition_id
+    );
+
+DISCARD ALL;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM upcoming_duels
+WHERE match_date <= CURRENT_DATE + 7
+    AND country LIKE '%Macedonia'
+ORDER BY match_date, kickoff, capacity DESC;
+
+/*
+ Gather Merge  (cost=70085.65..70821.95 rows=6322 width=209) (actual time=165.653..171.818 rows=1066.00 loops=1)
+  Workers Planned: 2
+  Workers Launched: 2
+  Buffers: shared hit=22474 read=745
+  ->  Sort  (cost=69085.62..69092.21 rows=2634 width=209) (actual time=119.400..119.438 rows=355.33 loops=3)
+"        Sort Key: ((d.start_time)::date), ((d.start_time)::time without time zone), l.capacity DESC"
+        Sort Method: quicksort  Memory: 159kB
+        Buffers: shared hit=22474 read=745
+        Worker 0:  Sort Method: quicksort  Memory: 90kB
+        Worker 1:  Sort Method: quicksort  Memory: 89kB
+        ->  Nested Loop Left Join  (cost=1580.63..68935.97 rows=2634 width=209) (actual time=2.081..118.640 rows=355.33 loops=3)
+              Buffers: shared hit=22426 read=745
+              ->  Hash Join  (cost=1580.21..67676.96 rows=2634 width=158) (actual time=2.054..116.126 rows=355.33 loops=3)
+                    Hash Cond: (d.sport_category_id = scat.id)
+                    Buffers: shared hit=18160 read=745
+                    ->  Nested Loop  (cost=1567.62..67657.37 rows=2634 width=134) (actual time=1.547..115.321 rows=355.33 loops=3)
+                          Buffers: shared hit=18105 read=745
+                          ->  Nested Loop  (cost=1567.20..66368.27 rows=2634 width=95) (actual time=1.526..113.189 rows=355.33 loops=3)
+                                Buffers: shared hit=13841 read=745
+                                ->  Hash Join  (cost=1566.78..65079.17 rows=2634 width=56) (actual time=1.438..110.678 rows=355.33 loops=3)
+                                      Hash Cond: (d.location_id = l.id)
+                                      Buffers: shared hit=9575 read=745
+                                      ->  Parallel Index Only Scan using duel_upcoming_indexes on duel d  (cost=0.56..62671.71 rows=217309 width=28) (actual time=0.577..103.221 rows=62623.33 loops=3)
+                                            Index Cond: (start_time > now())
+                                            Filter: ((start_time)::date <= (CURRENT_DATE + 7))
+                                            Rows Removed by Filter: 465586
+                                            Heap Fetches: 65
+                                            Index Searches: 1
+                                            Buffers: shared hit=8811 read=745
+                                      ->  Hash  (cost=1549.87..1549.87 rows=1308 width=36) (actual time=0.628..0.629 rows=340.00 loops=3)
+                                            Buckets: 2048  Batches: 1  Memory Usage: 42kB
+                                            Buffers: shared hit=764
+                                            ->  Nested Loop  (cost=0.42..1549.87 rows=1308 width=36) (actual time=0.346..0.548 rows=340.00 loops=3)
+                                                  Buffers: shared hit=764
+                                                  ->  Seq Scan on country c  (cost=0.00..3.06 rows=2 width=12) (actual time=0.298..0.305 rows=1.00 loops=3)
+                                                        Filter: ((name)::text ~~ '%Macedonia'::text)
+                                                        Rows Removed by Filter: 164
+                                                        Buffers: shared hit=3
+                                                  ->  Index Scan using unique_name_per_country on location l  (cost=0.42..766.86 rows=654 width=32) (actual time=0.044..0.178 rows=340.00 loops=3)
+                                                        Index Cond: (country_id = c.id)
+                                                        Index Searches: 3
+                                                        Buffers: shared hit=761
+                                ->  Index Scan using sport_team_pkey on sport_team home  (cost=0.42..0.49 rows=1 width=47) (actual time=0.006..0.006 rows=1.00 loops=1066)
+                                      Index Cond: (id = d.home_team_id)
+                                      Index Searches: 1066
+                                      Buffers: shared hit=4266
+                          ->  Index Scan using sport_team_pkey on sport_team away  (cost=0.42..0.49 rows=1 width=47) (actual time=0.005..0.005 rows=1.00 loops=1066)
+                                Index Cond: (id = d.away_team_id)
+                                Index Searches: 1066
+                                Buffers: shared hit=4264
+                    ->  Hash  (cost=8.37..8.37 rows=337 width=32) (actual time=0.497..0.497 rows=337.00 loops=3)
+                          Buckets: 1024  Batches: 1  Memory Usage: 30kB
+                          Buffers: shared hit=55
+                          ->  Seq Scan on sport_category scat  (cost=0.00..8.37 rows=337 width=32) (actual time=0.369..0.427 rows=337.00 loops=3)
+                                Buffers: shared hit=55
+              ->  Index Scan using competition_pkey on competition com  (cost=0.42..0.47 rows=1 width=51) (actual time=0.006..0.006 rows=1.00 loops=1066)
+                    Index Cond: (id = d.competition_id)
+                    Index Searches: 1066
+                    Buffers: shared hit=4266
+Planning:
+  Buffers: shared hit=51 read=18
+Planning Time: 4.352 ms
+Execution Time: 172.446 ms
+ */
+
+
+CREATE INDEX IF NOT EXISTS new_duel_upcoming_indexes ON
+    new_duel(
+         duel_time,
+         home_team_id,
+        away_team_id,
+        sport_category_id,
+        location_id,
+        competition_id
+    );
+
+DISCARD ALL;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM new_upcoming_duels
+WHERE match_date <= CURRENT_DATE + 7
+    AND country LIKE '%Macedonia'
+ORDER BY match_date, kickoff, capacity DESC;
+
+/*
+ Gather Merge  (cost=406224.46..407479.15 rows=10773 width=209) (actual time=339.093..364.434 rows=1066.00 loops=1)
+  Workers Planned: 2
+  Workers Launched: 2
+  Buffers: shared hit=14187 read=32057
+  ->  Sort  (cost=405224.44..405235.66 rows=4489 width=209) (actual time=288.284..288.316 rows=355.33 loops=3)
+"        Sort Key: nd.duel_date, nd.duel_time, l.capacity DESC"
+        Sort Method: quicksort  Memory: 79kB
+        Buffers: shared hit=14187 read=32057
+        Worker 0:  Sort Method: quicksort  Memory: 130kB
+        Worker 1:  Sort Method: quicksort  Memory: 129kB
+        ->  Nested Loop Left Join  (cost=1580.07..404952.13 rows=4489 width=209) (actual time=161.930..287.678 rows=355.33 loops=3)
+              Buffers: shared hit=14139 read=32057
+              ->  Hash Join  (cost=1579.64..402890.07 rows=4489 width=162) (actual time=161.899..285.220 rows=355.33 loops=3)
+                    Hash Cond: (nd.sport_category_id = scat.id)
+                    Buffers: shared hit=9873 read=32057
+                    ->  Nested Loop  (cost=1567.06..402865.56 rows=4489 width=138) (actual time=160.973..284.060 rows=355.33 loops=3)
+                          Buffers: shared hit=9858 read=32057
+                          ->  Nested Loop  (cost=1566.64..400760.25 rows=4489 width=99) (actual time=160.949..281.792 rows=355.33 loops=3)
+                                Buffers: shared hit=5594 read=32057
+                                ->  Hash Join  (cost=1566.22..398654.94 rows=4489 width=60) (actual time=160.909..279.251 rows=355.33 loops=3)
+                                      Hash Cond: (nd.location_id = l.id)
+                                      Buffers: shared hit=1328 read=32057
+                                      ->  Parallel Append  (cost=0.00..395655.14 rows=370319 width=32) (actual time=159.520..271.531 rows=62623.33 loops=3)
+                                            Buffers: shared hit=564 read=32057
+                                            Subplans Removed: 5
+                                            ->  Parallel Seq Scan on new_duel_2026 nd_1  (cost=0.00..78766.04 rows=367362 width=32) (actual time=159.517..265.460 rows=62623.33 loops=3)
+                                                  Filter: ((duel_date <= (CURRENT_DATE + 7)) AND ((duel_date > CURRENT_DATE) OR ((duel_date = CURRENT_DATE) AND ((duel_time)::time with time zone > CURRENT_TIME))))
+                                                  Rows Removed by Filter: 992120
+                                                  Buffers: shared hit=564 read=32057
+                                      ->  Hash  (cost=1549.87..1549.87 rows=1308 width=36) (actual time=1.140..1.142 rows=340.00 loops=3)
+                                            Buckets: 2048  Batches: 1  Memory Usage: 42kB
+                                            Buffers: shared hit=764
+                                            ->  Nested Loop  (cost=0.42..1549.87 rows=1308 width=36) (actual time=0.774..1.028 rows=340.00 loops=3)
+                                                  Buffers: shared hit=764
+                                                  ->  Seq Scan on country c  (cost=0.00..3.06 rows=2 width=12) (actual time=0.714..0.724 rows=1.00 loops=3)
+                                                        Filter: ((name)::text ~~ '%Macedonia'::text)
+                                                        Rows Removed by Filter: 164
+                                                        Buffers: shared hit=3
+                                                  ->  Index Scan using unique_name_per_country on location l  (cost=0.42..766.86 rows=654 width=32) (actual time=0.054..0.227 rows=340.00 loops=3)
+                                                        Index Cond: (country_id = c.id)
+                                                        Index Searches: 3
+                                                        Buffers: shared hit=761
+                                ->  Index Scan using sport_team_pkey on sport_team home  (cost=0.42..0.47 rows=1 width=47) (actual time=0.006..0.006 rows=1.00 loops=1066)
+                                      Index Cond: (id = nd.home_team_id)
+                                      Index Searches: 1066
+                                      Buffers: shared hit=4266
+                          ->  Index Scan using sport_team_pkey on sport_team away  (cost=0.42..0.47 rows=1 width=47) (actual time=0.005..0.005 rows=1.00 loops=1066)
+                                Index Cond: (id = nd.away_team_id)
+                                Index Searches: 1066
+                                Buffers: shared hit=4264
+                    ->  Hash  (cost=8.37..8.37 rows=337 width=32) (actual time=0.910..0.910 rows=337.00 loops=3)
+                          Buckets: 1024  Batches: 1  Memory Usage: 30kB
+                          Buffers: shared hit=15
+                          ->  Seq Scan on sport_category scat  (cost=0.00..8.37 rows=337 width=32) (actual time=0.743..0.816 rows=337.00 loops=3)
+                                Buffers: shared hit=15
+              ->  Index Scan using competition_pkey on competition com  (cost=0.42..0.46 rows=1 width=51) (actual time=0.006..0.006 rows=1.00 loops=1066)
+                    Index Cond: (id = nd.competition_id)
+                    Index Searches: 1066
+                    Buffers: shared hit=4266
+Planning:
+  Buffers: shared hit=12
+Planning Time: 4.553 ms
+Execution Time: 364.786 ms
+ */
