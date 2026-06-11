@@ -180,9 +180,7 @@ WHERE
           AND d.start_time +
               (interval '1 minute' * cat.duration_minutes) >
               '2026-05-10 16:00:00'::timestamp -- start of range
-    )
-ORDER BY capacity
-;
+    );
 -----------------------------------------------------------------------------
 -- 5. top scorers on competition
 create index score_top_scorers_indexes ON
