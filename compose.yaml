@@ -1,15 +1,17 @@
 # Temporary db for testing
 services:
   nbp_test_posgres:
-    image: postgres
+    image: postgres:17-alpine
     restart: always
     shm_size: 128mb
     environment:
       POSTGRES_PASSWORD: passowrod123
       POSTGRES_USER: testadmin
+      POSTGRES_DB: irson
     ports:
       - 5432:5432
-    command: >
-      bash -c "apt-get update &&
-               apt-get install -y curl &&
-               docker-entrypoint.sh postgres"
+    volumes:
+      - irosn_data:/var/lib/postgresql/data
+
+volumes:
+  irosn_data:

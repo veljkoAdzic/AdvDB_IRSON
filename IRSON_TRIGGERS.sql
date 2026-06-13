@@ -252,7 +252,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_limit_referee_daily_duels
-BEFORE INSERT OR UPDATE ON REFEREEING_DUEL
-FOR EACH ROW
-EXECUTE FUNCTION check_referee_availability();
+-- NOTE:assign_referee_for_duel gi izvrshuva istite proverki 
+
+-- CREATE TRIGGER trg_limit_referee_daily_duels
+-- BEFORE INSERT OR UPDATE ON REFEREEING_DUEL
+-- FOR EACH ROW
+-- EXECUTE FUNCTION check_referee_availability();

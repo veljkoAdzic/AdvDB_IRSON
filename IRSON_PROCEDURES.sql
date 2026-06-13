@@ -185,60 +185,103 @@ END;
 $$;
 CALL register_referee('030299412014', 'Ivicaaa', 'Perovski', '1994-02-03'::date, 'M', 112, 1, 112);
 -----------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE renew_sportsperson_contract(
-    old_contract_id int4,
+CREATE OR REPLACE PROCEDURE add_contract(
+    p_ssn char(13),
+    n_club_id int4,
+    n_start_date date,
     n_end_date date,
     n_payout int4
 )
 LANGUAGE plpgsql AS $$
 DECLARE
-    o_ssn char(13);
-    o_club_id int4;
+    old_contract_id int4;
     o_end_date date;
 
 BEGIN
     -- Input validacija
-    IF n_end_date IS NOT NULL and n_end_date < now() THEN
-        RAISE EXCEPTION 'Invalid n_end_date - must be in the future!';
+    IF NOT EXISTS(SELECT 1 FROM sportsperson WHERE ssn = p_ssn) THEN
+        RAISE EXCEPTION 'Invalid p_ssn - Sportsperson does not exist!';
     END IF;
 
-    IF NOT EXISTS( SELECT 1 FROM sportsperson_contract WHERE id = old_contract_id) THEN
-        RAISE EXCEPTION 'Invalid old_contract_id - contract with id % does not exist!', old_contract_id;
+    IF n_start_date IS NOT NULL AND NOT valid_date_range(n_start_date, n_end_date) THEN
+        RAISE EXCEPTION 'Invalid dates - n_start_date must be before n_end_date!';
+    END IF;
+
+    IF
+        ( n_start_date IS NOT NULL AND n_start_date < now()::date )
+        OR ( n_end_date IS NOT NULL AND n_end_date < now()::date )
+    THEN
+        RAISE EXCEPTION 'Invalid dates - date range cannot be in the past!';
     END IF;
 
     IF n_payout <= 0 THEN
         RAISE EXCEPTION 'Invalid n_payout - Payout must be positive amount!';
     END IF;
 
-    -- Zimanje stari vrednosti
-    SELECT
-        player_ssn, club_id, end_date
-        INTO
-        o_ssn, o_club_id, o_end_date
-    FROM sportsperson_contract
-    WHERE id = old_contract_id;
 
-    -- azuriranje star dogovir
-    IF o_end_date IS NULL THEN
-        UPDATE sportsperson_contract
-        SET end_date = now()::date
-        WHERE id = old_contract_id
+    -- Obnovuvame dogovor
+    IF
+        EXISTS(
+            SELECT 1
+            FROM sportsperson_contract
+            WHERE
+                player_ssn = p_ssn
+                AND club_id = n_club_id
+                AND (end_date IS NULL OR end_date >= now()::date)
+       )
+    THEN
+
+        IF n_club_id NOT IN (
+           SELECT c.id
+           FROM player_career_history h
+           join sport_club c
+            on h.club_name = c.name
+           WHERE h.ssn = p_ssn
+             and h.contract_status = 'ACTIVE'
+        ) THEN
+           RAISE EXCEPTION 'Invalid n_club_id - Player has no active contract with club!';
+        END IF;
+
+        -- Zimanje podatoci od star dogovor
+        select
+            id, end_date
+        into
+            old_contract_id, o_end_date
+        from sportsperson_contract
+        WHERE
+            player_ssn = p_ssn
+            and club_id = n_club_id
+            and (end_date IS NULL OR end_date > now()::date)
         ;
-        SELECT now()::date into o_end_date;
+
+        -- proverka za validen nov obseg
+        IF n_end_date IS NOT NULL and o_end_date > n_end_date THEN
+            RAISE EXCEPTION 'Invalid n_end_date - must be after %', o_end_date;
+        END IF;
+
+        -- azuriranje star dogovor ako e so neopredeln kraj
+        IF o_end_date IS NULL THEN
+            UPDATE sportsperson_contract
+            SET end_date = n_start_date - INTERVAL '1 day'
+            WHERE id = old_contract_id;
+        END IF;
     END IF;
 
-    -- proverka za validen nov obseg
-    IF n_end_date IS NOT NULL and o_end_date > n_end_date THEN
-        RAISE EXCEPTION 'Invalid n_end_date - must be after %', o_end_date;
-    END IF;
-
-    -- dodavanje nov dogovor
     INSERT INTO sportsperson_contract(player_ssn, club_id, start_date, end_date, payout)
-    VALUES (o_ssn, o_club_id, o_end_date, n_end_date, n_payout);
-    COMMIT;
+        VALUES (p_ssn, n_club_id, n_start_date, n_end_date, n_payout);
 END;
 $$;
-call renew_sportsperson_contract(6050471, NULL, 2000000);
+
+call add_contract('010100042545', 45, now()::date, NULL, 65000);
+call add_contract(
+        '010100042545',
+        45,
+        now()::date,
+        null,
+        65000);
+
+SELECT * from player_career_history WHERE ssn = '010100042545';
+
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE borrow_player(
     p_ssn char(13),
@@ -351,6 +394,7 @@ END;
 $$;
 CALL promote_sportsperson_to_coach('150100143541', 1816); -- okay
 CALL promote_sportsperson_to_coach('150100143541', 1816); -- already promoted
+
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE start_new_season(
     league_id              int4,
@@ -367,6 +411,7 @@ DECLARE
     scat_id int4;
     fed_id int4;
     c_id int4;
+    n_d RECORD;
 BEGIN
     IF years_from_last_season < 0 OR years_from_last_season > 20 THEN
         RAISE EXCEPTION 'Invalid years_from_last_season – must be in [0, 20]';
@@ -437,6 +482,17 @@ BEGIN
         LIMIT 1;
     END IF;
 
+    COMMIT;
+
+    CREATE TEMP TABLE created_duels (
+        home_team_id INT4 NOT NULL, 
+        away_team_id INT4 NOT NULL, 
+        location_id INT4 NOT NULL, 
+        competition_id INT4,
+        start_time TIMESTAMP NOT NULL, 
+        sport_category_id INT4 NOT NULL
+    ) ON COMMIT DROP;
+
     WITH score_logic (sport_id, multiplier, offset_val) AS (
         VALUES
             (1,5,0),(9,11,0),(11,11,0),(16,11,0),(17,11,0),
@@ -504,9 +560,9 @@ BEGIN
         JOIN teams tb ON tb.idx = p.b_idx
         WHERE ta.tid <> tb.tid
     )
-    INSERT INTO duel (
+    INSERT INTO created_duels (
         home_team_id, away_team_id, location_id, competition_id,
-        start_time, sport_category_id, home_team_score, away_team_score
+        start_time, sport_category_id
     )
     SELECT r.home_id,
            r.away_id,
@@ -524,12 +580,31 @@ BEGIN
                       THEN INTERVAL '18 hours'
                       ELSE INTERVAL '12 hours'
                  END AS start_time,
-           scat_id,
-           NULL::int,
-           NULL::int
+           scat_id
     FROM resolved r
     LEFT JOIN score_logic sl ON sl.sport_id = (
                SELECT sc.sport_id FROM sport_category sc WHERE sc.id = scat_id);
+
+    FOR n_d IN (SELECT * FROM created_duels) LOOP
+        BEGIN
+            INSERT INTO duel (
+                home_team_id, away_team_id, location_id, competition_id,
+                start_time, sport_category_id, home_team_score, away_team_score
+            ) 
+            VALUES (
+                n_d.home_team_id, n_d.away_team_id, n_d.location_id, n_d.competition_id,
+                n_d.start_time, n_d.sport_category_id, NULL, NULL
+                )
+            ;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Inserting duel failed with values (%, %, %, %, %, %)',
+                n_d.home_team_id, n_d.away_team_id, n_d.location_id,
+                n_d.competition_id, n_d.start_time, n_d.sport_category_id
+            ;
+        END;
+    END LOOP;
+
+    COMMIT;
 END;
 $$;
 CALL start_new_season(2279810, 14); -- okay

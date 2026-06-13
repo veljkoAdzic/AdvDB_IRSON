@@ -1,6 +1,5 @@
 CREATE TABLE NEW_DUEL (
-    id                int4 NOT NULL,
-    daily_match_no    int4 NOT NULL,
+    id                SERIAL NOT NULL,
     duel_date         date NOT NULL,
     home_team_id      int4 NOT NULL,
     away_team_id      int4 NOT NULL,
@@ -10,7 +9,7 @@ CREATE TABLE NEW_DUEL (
     sport_category_id int4 NOT NULL,
     home_team_score int4,
     away_team_score int4,
-    PRIMARY KEY (daily_match_no, duel_date)
+    PRIMARY KEY (id, duel_date)
 ) PARTITION BY RANGE (duel_date);
 
 
@@ -45,11 +44,13 @@ BEGIN
     END LOOP;
 END $$;
 
-
-INSERT INTO NEW_DUEL (id, daily_match_no, duel_date, home_team_id, away_team_id, location_id, competition_id, duel_time, sport_category_id, home_team_score, away_team_score)
+INSERT INTO NEW_DUEL (
+    id, duel_date, home_team_id,
+    away_team_id, location_id, competition_id, duel_time, 
+    sport_category_id, home_team_score, away_team_score
+    )
 SELECT
     d.id,
-    ROW_NUMBER() OVER (PARTITION BY d.start_time::date ORDER BY d.start_time) as daily_match_no,
     d.start_time::date as duel_date,
     d.home_team_id,
     d.away_team_id,
@@ -62,70 +63,84 @@ SELECT
 FROM DUEL d
 ORDER BY d.start_time;
 
+-- Migracija na id sekvenca
+SELECT
+    setval(
+        pg_get_serial_sequence('new_duel', 'id'),
+        (SELECT last_value FROM pg_sequences WHERE
+        schemaname || '.' || sequencename = pg_get_serial_sequence('duel', 'id'))
+    )
+;
+
+
 
 CREATE TABLE NEW_TEAM_ROSTER (
     player_ssn char(13) NOT NULL,
     team_id    int4 NOT NULL,
-    daily_match_no int4 NOT NULL,
+    duel_id    int4 NOT NULL,
     duel_date  date NOT NULL,
     start_time time NOT NULL,
     end_time   time
 );
 
-
 CREATE TABLE NEW_REFEREEING_DUEL (
     referee_ssn char(13) NOT NULL,
-    daily_match_no int4 NOT NULL,
+    duel_id     int4 NOT NULL,
     duel_date   date NOT NULL
 );
 
-
 CREATE TABLE NEW_SCORE (
-    id          int4 NOT NULL,
-    daily_match_no int4 NOT NULL,
+    id          SERIAL NOT NULL,
+    duel_id     int4 NOT NULL,
     duel_date   date NOT NULL,
     player_ssn  char(13) NOT NULL,
     time_score  time NOT NULL
 );
 
 
-INSERT INTO NEW_TEAM_ROSTER (player_ssn, team_id, daily_match_no, duel_date, start_time, end_time)
+INSERT INTO NEW_TEAM_ROSTER (player_ssn, team_id, duel_id, duel_date, start_time, end_time)
 SELECT
     tr.player_ssn,
     tr.team_id,
-    nd.daily_match_no,
+    nd.id,
     nd.duel_date,
     tr.start_time,
     tr.end_time
 FROM team_roster tr
 JOIN duel d ON tr.duel_id = d.id
 JOIN NEW_DUEL nd ON nd.id = d.id
-ORDER BY nd.duel_date, nd.daily_match_no;
+ORDER BY nd.duel_date, nd.id;
 
-
-INSERT INTO NEW_REFEREEING_DUEL (referee_ssn, daily_match_no, duel_date)
+INSERT INTO NEW_REFEREEING_DUEL (referee_ssn, duel_id, duel_date)
 SELECT
     rd.referee_ssn,
-    nd.daily_match_no,
+    nd.id,
     nd.duel_date
 FROM refereeing_duel rd
 JOIN duel d ON rd.duel_id = d.id
 JOIN NEW_DUEL nd ON nd.id = d.id
-ORDER BY nd.duel_date, nd.daily_match_no;
+ORDER BY nd.duel_date, nd.id;
 
-
-INSERT INTO NEW_SCORE (id, daily_match_no, duel_date, player_ssn, time_score)
+INSERT INTO NEW_SCORE (id, duel_id, duel_date, player_ssn, time_score)
 SELECT
     s.id,
-    nd.daily_match_no,
+    nd.id,
     nd.duel_date,
     s.player_ssn,
     s.time_score
 FROM score s
 JOIN duel d ON s.duel_id = d.id
 JOIN NEW_DUEL nd ON nd.id = d.id
-ORDER BY nd.duel_date, nd.daily_match_no;
+ORDER BY nd.duel_date, nd.id;
 
+-- Migracija na id sekvenca
+SELECT
+    setval(
+        pg_get_serial_sequence('new_score', 'id'),
+        (SELECT last_value FROM pg_sequences WHERE
+        schemaname || '.' || sequencename = pg_get_serial_sequence('score', 'id'))
+    )
+;
 
 ALTER TABLE NEW_DUEL
 ADD CONSTRAINT nd_competition_fk FOREIGN KEY (competition_id) REFERENCES COMPETITION (id) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -137,23 +152,23 @@ ADD CONSTRAINT nd_different_teams_c CHECK (home_team_id != away_team_id);
 
 
 ALTER TABLE NEW_TEAM_ROSTER
-ADD PRIMARY KEY (player_ssn, team_id, daily_match_no, duel_date),
+ADD PRIMARY KEY (player_ssn, team_id, duel_id, duel_date),
 ADD CONSTRAINT ntr_roster_date_check CHECK (end_time IS NULL OR start_time < end_time),
 ADD CONSTRAINT ntr_sportsperson_fk FOREIGN KEY (player_ssn) REFERENCES SPORTSPERSON (ssn) ON DELETE RESTRICT ON UPDATE CASCADE,
 ADD CONSTRAINT ntr_team_fk FOREIGN KEY (team_id) REFERENCES SPORT_TEAM (id) ON DELETE RESTRICT ON UPDATE CASCADE,
-ADD CONSTRAINT ntr_duel_fk FOREIGN KEY (daily_match_no, duel_date) REFERENCES NEW_DUEL (daily_match_no, duel_date) ON DELETE RESTRICT ON UPDATE CASCADE;
+ADD CONSTRAINT ntr_duel_fk FOREIGN KEY (duel_id, duel_date) REFERENCES NEW_DUEL (id, duel_date) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 
 ALTER TABLE NEW_REFEREEING_DUEL
-ADD PRIMARY KEY (referee_ssn, daily_match_no, duel_date),
-ADD CONSTRAINT nrd_nd_fk FOREIGN KEY (daily_match_no, duel_date) REFERENCES NEW_DUEL (daily_match_no, duel_date) ON DELETE RESTRICT ON UPDATE CASCADE,
+ADD PRIMARY KEY (referee_ssn, duel_id, duel_date),
+ADD CONSTRAINT nrd_nd_fk FOREIGN KEY (duel_id, duel_date) REFERENCES NEW_DUEL (id, duel_date) ON DELETE RESTRICT ON UPDATE CASCADE,
 ADD CONSTRAINT nrd_referee_fk FOREIGN KEY (referee_ssn) REFERENCES REFEREE (ssn) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 
 ALTER TABLE NEW_SCORE
 ADD PRIMARY KEY (id),
 ADD CONSTRAINT ns_player_ssn FOREIGN KEY (player_ssn) REFERENCES SPORTSPERSON (ssn) ON DELETE RESTRICT ON UPDATE CASCADE,
-ADD CONSTRAINT ns_duel_fk FOREIGN KEY (daily_match_no, duel_date) REFERENCES NEW_DUEL (daily_match_no, duel_date) ON DELETE RESTRICT ON UPDATE CASCADE;
+ADD CONSTRAINT ns_duel_fk FOREIGN KEY (duel_id, duel_date) REFERENCES NEW_DUEL (id, duel_date) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE VIEW new_upcoming_duels AS
 SELECT
